@@ -400,6 +400,4 @@ router.get("/photos/:activityId", async (req, res) => {
   }
 });
 
-
-
 module.exports = router;
