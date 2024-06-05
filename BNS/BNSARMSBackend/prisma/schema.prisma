@@ -29,21 +29,22 @@ model User {
 }
 
 model Beneficiary {
-  beneficiaryId Int     @id @default(autoincrement()) @map("beneficiary_id")
-  firstName     String  @map("first_name")
-  middleName    String?
-  lastName      String  @map("last_name")
-  suffix        String?
-  birthdate     DateTime
-  age           String?
-  sex           String
-  job           String?
-  barangay      String
-  healthStation String
-  primaryType   String
-  civilStatus   String
-  contactNumber String?
-  isArchived Boolean @default(false) // Add this line
+  beneficiaryId  Int      @id @default(autoincrement()) @map("beneficiary_id")
+  firstName      String   @map("first_name")
+  middleName     String?
+  lastName       String   @map("last_name")
+  suffix         String?
+  birthdate      DateTime
+  age            String?
+  sex            String
+  job            String?
+  barangay       String
+  healthStation  String
+  ageGroup       String   // Add this field to store a single age group
+  subType        String?  // Add this field to store a single subtype, optional
+  civilStatus    String
+  contactNumber  String?
+  isArchived     Boolean  @default(false) // Add this line
 
   activityParticipation ActivityParticipation[] @relation("BeneficiaryToParticipant")
   beneficiaryTypes      BeneficiaryTypes[]      @relation("BeneficiaryToTypes")
@@ -51,42 +52,20 @@ model Beneficiary {
   @@map("beneficiaries")
 }
 
+
 model Type {
   typeId          Int       @id @default(autoincrement()) @map("type_id")
   typeName        String
-  typeCategory    String    // "Secondary" or "Tertiary"
-  parentTypeId    Int?      // For linking secondary types to primary types, and tertiary types to secondary types
-  sex             String?   // "Male", "Female", or null if applicable to both
+  ageGroups       String[]  // Array of age groups this type applies to
+  sex             String[]   // "Male", "Female", or null if applicable to both
+  subTypes        String[]  // Array of subtypes for this type
   isArchived      Boolean   @default(false) // Add this line
 
-  parentType      Type? @relation("SubTypes", fields: [parentTypeId], references: [typeId])
-  subTypes        Type[] @relation("SubTypes")
-
-  primaryTypes    TypePrimaryTypes[]
   beneficiaryTypes BeneficiaryTypes[] @relation("TypeToBeneficiaries")
 
   @@map("types")
 }
 
-model PrimaryType {
-  primaryTypeId Int    @id @default(autoincrement()) @map("primary_type_id")
-  typeName      String
-
-  types         TypePrimaryTypes[]
-
-  @@map("primary_types")
-}
-
-model TypePrimaryTypes {
-  typeId        Int
-  primaryTypeId Int
-
-  type          Type        @relation(fields: [typeId], references: [typeId])
-  primaryType   PrimaryType @relation(fields: [primaryTypeId], references: [primaryTypeId])
-
-  @@id([typeId, primaryTypeId])
-  @@map("type_primary_types")
-}
 
 model BeneficiaryTypes {
   beneficiaryId Int @map("beneficiary_id")
