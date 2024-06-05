@@ -56,7 +56,7 @@ const ReportSubmissionPage = () => {
     const fetchReportDetails = async () => {
       try {
         const response = await axios.get(
-          `http://localhost:3000/newReports/${reportId}?userId=${userId}`
+          `http://localhost:3000/newReports/report/${reportId}?userId=${userId}`
         );
         setReportDetails(response.data);
         setFileHistory(response.data.fileHistory);
