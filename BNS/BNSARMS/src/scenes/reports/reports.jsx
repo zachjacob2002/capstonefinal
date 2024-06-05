@@ -309,24 +309,7 @@ const Reports = () => {
       field: "type",
       headerName: "Type",
       width: 400,
-      renderCell: (params) => (
-        <Box
-          sx={{
-            bgcolor:
-              params.value === "Narrative Report"
-                ? "lightBlue"
-                : params.value === "Work Activity Schedule Report"
-                ? "#ffdd72"
-                : params.value === "Monthly Accomplishment Report"
-                ? "#b2fab4"
-                : "#aa90d7",
-            borderRadius: 2,
-            p: 1,
-          }}
-        >
-          {params.value}
-        </Box>
-      ),
+      renderCell: (params) => <Box>{params.value}</Box>,
     },
     {
       field: "month",
@@ -344,17 +327,7 @@ const Reports = () => {
       headerName: "Due Date",
       width: 300,
       valueFormatter: (params) => formatDate(params.value),
-      renderCell: (params) => (
-        <Box
-          sx={{
-            bgcolor: "#FFE8C5",
-            borderRadius: 2,
-            p: 1,
-          }}
-        >
-          {formatDate(params.value)}
-        </Box>
-      ),
+      renderCell: (params) => <Box>{formatDate(params.value)}</Box>,
     },
   ];
 
@@ -478,25 +451,6 @@ const Reports = () => {
           }}
           getRowId={(row) => row.reportId}
           getRowHeight={() => 70}
-          sx={{
-            "& .MuiDataGrid-row": {
-              bgcolor: "#e0f7e0",
-              color: "green",
-              fontWeight: "bold",
-              fontSize: "1rem",
-              "&:hover": {
-                bgcolor: "lightGreen",
-              },
-              "&.Mui-selected, &.MuiDataGrid-row--selected": {
-                bgcolor: "rgba(50, 205, 50, 0.8)",
-              },
-            },
-            "& .MuiDataGrid-columnHeaders": {
-              bgcolor: "darkGreen",
-              color: "white",
-              fontSize: "1.1rem",
-            },
-          }}
           onRowClick={handleRowClick}
         />
       </Box>
@@ -528,6 +482,7 @@ const Reports = () => {
               name="type"
               value={newReport.type}
               onChange={handleNewReportChange}
+              label="Report Type"
             >
               <MenuItem value="Monthly Accomplishment Report">
                 Monthly Accomplishment Report

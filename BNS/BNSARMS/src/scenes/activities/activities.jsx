@@ -193,17 +193,7 @@ const Activities = () => {
       field: "title",
       headerName: "Title",
       width: 500,
-      renderCell: (params) => (
-        <Box
-          sx={{
-            bgcolor: "#b2fab4", // Slightly darker green than the row color
-            borderRadius: 2,
-            p: 1,
-          }}
-        >
-          {params.value}
-        </Box>
-      ),
+      renderCell: (params) => <Box>{params.value}</Box>,
     },
     {
       field: "description",
@@ -215,17 +205,7 @@ const Activities = () => {
       headerName: "Date",
       width: 150,
       valueFormatter: (params) => formatDate(params.value),
-      renderCell: (params) => (
-        <Box
-          sx={{
-            bgcolor: "#FFE8C5", // Slightly darker green than the row color
-            borderRadius: 2,
-            p: 1,
-          }}
-        >
-          {formatDate(params.value)}
-        </Box>
-      ),
+      renderCell: (params) => <Box>{formatDate(params.value)}</Box>,
     },
     {
       field: "numberOfBeneficiaries",
@@ -388,25 +368,6 @@ const Activities = () => {
             numberOfBeneficiaries: false,
           }}
           getRowHeight={() => 70}
-          sx={{
-            "& .MuiDataGrid-row": {
-              bgcolor: "#e0f7e0", // Much lighter green, close to white
-              color: "green",
-              fontWeight: "bold",
-              fontSize: "1rem",
-              "&:hover": {
-                bgcolor: "lightGreen", // Slightly darker green on hover
-              },
-              "&.Mui-selected, &.MuiDataGrid-row--selected": {
-                bgcolor: "rgba(50, 205, 50, 0.8)", // Slightly darker green on selection
-              },
-            },
-            "& .MuiDataGrid-columnHeaders": {
-              bgcolor: "darkGreen",
-              color: "white",
-              fontSize: "1.1rem", // Slightly larger font size for column headers
-            },
-          }}
           getRowId={(row) => row.id} // Ensure each row has a unique id
           onRowClick={(params) => navigate(`/app/activities/view/${params.id}`)}
         />

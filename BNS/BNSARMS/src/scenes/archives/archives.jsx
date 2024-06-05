@@ -400,7 +400,7 @@ const Archives = () => {
         onChange={handleChange}
         aria-label="simple tabs example"
         sx={{
-          backgroundColor: "palegreen", // Change background color of tabs to pale green
+          // Change background color of tabs to pale green
           "& .MuiTabs-indicator": {
             backgroundColor: "darkgreen", // Change indicator color to dark green
             height: 4, // Make the indicator slightly thicker
