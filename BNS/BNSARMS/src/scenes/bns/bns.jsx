@@ -145,6 +145,11 @@ export const BNS = () => {
             columns={columns}
             pageSize={5}
             onRowClick={(params) => handleOpenNewBNSModal(params.row)} // Row becomes clickable
+            sx={{
+              "& .MuiDataGrid-columnHeaderTitle": {
+                fontWeight: "bold",
+              },
+            }}
           />
         </div>
       </Box>

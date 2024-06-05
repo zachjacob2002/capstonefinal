@@ -1,6 +1,4 @@
-// manageBeneficaryType.jsx
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Box,
   TextField,
@@ -8,16 +6,19 @@ import {
   Checkbox,
   Typography,
   IconButton,
+  Button,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import CheckBoxIcon from "@mui/icons-material/CheckBox";
 import CheckBoxOutlineBlankIcon from "@mui/icons-material/CheckBoxOutlineBlank";
 import Header from "../../components/Header";
+import axios from "axios";
+import { useSnackbar } from "../../context/SnackbarContext";
+import { useNavigate, useLocation } from "react-router-dom";
 
 const ManageBeneficiaryTypesPage = () => {
   const [subTypes, setSubTypes] = useState([]);
   const [ageGroupChecked, setAgeGroupChecked] = useState({
-    all: false,
     Infant: false,
     Toddler: false,
     Child: false,
@@ -26,10 +27,36 @@ const ManageBeneficiaryTypesPage = () => {
     "Senior Citizen": false,
   });
   const [sexChecked, setSexChecked] = useState({
-    all: false,
     Male: false,
     Female: false,
   });
+  const [typeName, setTypeName] = useState("");
+  const [typeNameError, setTypeNameError] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const navigate = useNavigate();
+  const { showSnackbar } = useSnackbar();
+  const { state } = useLocation();
+  const isEditMode = state && state.type;
+
+  useEffect(() => {
+    if (isEditMode) {
+      const { typeName, ageGroups, sex, subTypes } = state.type;
+      setTypeName(typeName);
+      setAgeGroupChecked((prev) =>
+        Object.keys(prev).reduce((acc, key) => {
+          acc[key] = ageGroups.includes(key);
+          return acc;
+        }, {})
+      );
+      setSexChecked((prev) =>
+        Object.keys(prev).reduce((acc, key) => {
+          acc[key] = sex.includes(key);
+          return acc;
+        }, {})
+      );
+      setSubTypes(subTypes);
+    }
+  }, [isEditMode, state]);
 
   const handleAddSubtype = () => {
     setSubTypes([...subTypes, ""]);
@@ -44,24 +71,110 @@ const ManageBeneficiaryTypesPage = () => {
 
   const handleSelectAll = (group) => {
     if (group === "ageGroup") {
-      const newChecked = !ageGroupChecked.all;
+      const allChecked = !Object.values(ageGroupChecked).every(Boolean);
       setAgeGroupChecked({
-        all: newChecked,
-        Infant: newChecked,
-        Toddler: newChecked,
-        Child: newChecked,
-        Teen: newChecked,
-        Adult: newChecked,
-        "Senior Citizen": newChecked,
+        Infant: allChecked,
+        Toddler: allChecked,
+        Child: allChecked,
+        Teen: allChecked,
+        Adult: allChecked,
+        "Senior Citizen": allChecked,
       });
     } else if (group === "sex") {
-      const newChecked = !sexChecked.all;
+      const allChecked = !Object.values(sexChecked).every(Boolean);
       setSexChecked({
-        all: newChecked,
-        Male: newChecked,
-        Female: newChecked,
+        Male: allChecked,
+        Female: allChecked,
       });
     }
+  };
+
+  useEffect(() => {
+    const checkDuplicateTypeName = async () => {
+      if (typeName && !isEditMode) {
+        try {
+          const response = await axios.post(
+            "http://localhost:3000/types/check-duplicate",
+            { typeName }
+          );
+          setTypeNameError(
+            response.data.isDuplicate ? "Type name already exists" : ""
+          );
+        } catch (error) {
+          console.error("Error checking duplicate type name:", error);
+        }
+      } else {
+        setTypeNameError("");
+      }
+    };
+    checkDuplicateTypeName();
+  }, [typeName, isEditMode]);
+
+  const validateForm = async () => {
+    if (!typeName) {
+      setTypeNameError("Type name is required");
+      return false;
+    }
+
+    if (typeNameError) {
+      return false;
+    }
+
+    if (
+      !Object.values(ageGroupChecked).some((checked) => checked) ||
+      !Object.values(sexChecked).some((checked) => checked)
+    ) {
+      alert("Please select at least one age group and one sex");
+      return false;
+    }
+
+    return true;
+  };
+
+  const handleSave = async () => {
+    const isValid = await validateForm();
+    if (!isValid) return;
+
+    setIsSaving(true);
+    try {
+      const payload = {
+        typeName,
+        ageGroups: Object.keys(ageGroupChecked).filter(
+          (key) => ageGroupChecked[key]
+        ),
+        sex: Object.keys(sexChecked).filter((key) => sexChecked[key]),
+        subTypes,
+      };
+
+      if (isEditMode) {
+        await axios.put(
+          `http://localhost:3000/types/${state.type.typeId}`,
+          payload
+        );
+        console.log("Type updated successfully");
+        showSnackbar("Type updated successfully", "success");
+      } else {
+        await axios.post("http://localhost:3000/types", payload);
+        console.log("New type saved successfully");
+        showSnackbar("New type saved successfully", "success");
+      }
+
+      navigate("/app/viewtypes");
+    } catch (error) {
+      console.error("Error saving type:", error);
+      showSnackbar(`Error ${isEditMode ? "updating" : "saving"} type`, "error");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const isFormValid = () => {
+    return (
+      typeName &&
+      !typeNameError &&
+      Object.values(ageGroupChecked).some((checked) => checked) &&
+      Object.values(sexChecked).some((checked) => checked)
+    );
   };
 
   return (
@@ -69,7 +182,7 @@ const ManageBeneficiaryTypesPage = () => {
       <Box display="flex" justifyContent="space-between" alignItems="center">
         <Header
           title="Beneficiary Type"
-          subtitle="Create New Beneficiary Type"
+          subtitle={`${isEditMode ? "Edit" : "Create New"} Beneficiary Type`}
         />
       </Box>
       <Box>
@@ -77,7 +190,8 @@ const ManageBeneficiaryTypesPage = () => {
           Beneficiary Type Name:
         </Typography>
         <Typography variant="subtitle2" color="textSecondary" sx={{ mb: 2 }}>
-          Enter the name of the New Beneficiary Type
+          Enter the name of the {isEditMode ? "existing" : "new"} Beneficiary
+          Type
         </Typography>
         <TextField
           fullWidth
@@ -86,7 +200,12 @@ const ManageBeneficiaryTypesPage = () => {
           label="Beneficiary Type Name"
           type="text"
           sx={{ width: "20%" }}
+          value={typeName}
+          onChange={(e) => setTypeName(e.target.value)}
         />
+        {typeNameError && (
+          <Typography color="error">{typeNameError}</Typography>
+        )}
       </Box>
       <Box mt={2}>
         <Typography variant="body1" fontWeight="bold" fontSize={18}>
@@ -104,7 +223,7 @@ const ManageBeneficiaryTypesPage = () => {
             onClick={() => handleSelectAll("ageGroup")}
           >
             <IconButton size="small" color="primary">
-              {ageGroupChecked.all ? (
+              {Object.values(ageGroupChecked).every(Boolean) ? (
                 <CheckBoxIcon />
               ) : (
                 <CheckBoxOutlineBlankIcon />
@@ -151,7 +270,11 @@ const ManageBeneficiaryTypesPage = () => {
             onClick={() => handleSelectAll("sex")}
           >
             <IconButton size="small" color="primary">
-              {sexChecked.all ? <CheckBoxIcon /> : <CheckBoxOutlineBlankIcon />}
+              {Object.values(sexChecked).every(Boolean) ? (
+                <CheckBoxIcon />
+              ) : (
+                <CheckBoxOutlineBlankIcon />
+              )}
             </IconButton>
             Select All
           </Typography>
@@ -209,6 +332,26 @@ const ManageBeneficiaryTypesPage = () => {
             </Typography>
           ) : null}
         </Box>
+      </Box>
+      <Box mt={2} display="flex" justifyContent="flex-end">
+        <Button
+          variant="contained"
+          color="secondary"
+          onClick={() => {
+            /* Handle cancel action */
+          }}
+        >
+          Cancel
+        </Button>
+        <Button
+          variant="contained"
+          color="primary"
+          onClick={handleSave}
+          disabled={!isFormValid() || isSaving}
+          sx={{ ml: 2 }}
+        >
+          {isEditMode ? "Update" : "Save"}
+        </Button>
       </Box>
     </Box>
   );

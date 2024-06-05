@@ -327,25 +327,23 @@ const Archives = () => {
     },
     { field: "typeId", headerName: "ID", width: 90 },
     { field: "typeName", headerName: "Type Name", width: 150 },
-    { field: "typeCategory", headerName: "Type Category", width: 150 },
     {
-      field: "primaryTypes",
-      headerName: "Primary Type Referenced",
-      width: 200,
-      valueGetter: (params) =>
-        params.row.primaryTypes.length > 0
-          ? params.row.primaryTypes
-              .map((pt) => pt.primaryType.typeName)
-              .join(", ")
-          : "N/A",
+      field: "ageGroups",
+      headerName: "Age Groups",
+      width: 300,
+      valueGetter: (params) => params.row.ageGroups.join(", "),
     },
-    { field: "sex", headerName: "Sex", width: 120 },
     {
-      field: "parentType",
-      headerName: "Secondary Type Referenced",
-      width: 150,
-      valueGetter: (params) =>
-        params.row.parentType ? params.row.parentType.typeName : "N/A",
+      field: "sex",
+      headerName: "Sex",
+      width: 120,
+      valueGetter: (params) => params.row.sex.join(", "),
+    },
+    {
+      field: "subTypes",
+      headerName: "Sub Types",
+      width: 300,
+      valueGetter: (params) => params.row.subTypes.join(", "),
     },
   ];
 
@@ -466,6 +464,9 @@ const Archives = () => {
             pageSize={5}
             rowsPerPageOptions={[5]}
             getRowId={(row) => row.typeId} // Specify the custom row ID
+            columnVisibilityModel={{
+              typeId: false,
+            }}
           />
         </TabPanel>
       )}

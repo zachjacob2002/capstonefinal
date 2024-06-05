@@ -85,9 +85,6 @@ const ReportPaper = ({ title, status, color }) => {
         />
       </Box>
       <Divider sx={{ my: 1, bgcolor: "green" }} />
-      <Typography variant="body2" sx={{ cursor: "pointer", color: "black" }}>
-        Click to View Details
-      </Typography>
     </Paper>
   );
 };

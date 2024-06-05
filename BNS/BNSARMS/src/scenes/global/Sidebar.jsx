@@ -346,7 +346,7 @@ const Sidebar = () => {
                   style={{ color: "white" }}
                 >
                   <Link
-                    to="/app/managetypes"
+                    to="/app/viewtypes"
                     style={{ textDecoration: "none", color: "inherit" }}
                   >
                     Manage Beneficiary Types

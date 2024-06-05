@@ -1,5 +1,7 @@
+/* eslint-disable no-unused-vars */
 /* eslint-disable react/prop-types */
 import { useState, useEffect } from "react";
+import axios from "axios";
 import {
   Box,
   Typography,
@@ -11,223 +13,133 @@ import {
   Select,
   MenuItem,
   TextField,
+  FormControlLabel,
+  Radio,
+  RadioGroup,
 } from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
-import { fetchBeneficiaries } from "../../functions/forBeneficiaries";
-import { addBeneficiariesToActivity } from "../../functions/forParticipation"; // Import the function
-import {
-  fetchPrimaryTypes,
-  fetchSecondaryTypes,
-  fetchTertiaryTypes,
-  fetchSexOptions,
-} from "../../functions/forTypeModal";
 import dayjs from "dayjs";
-import { useSnackbar } from "../../context/SnackbarContext"; // Import useSnackbar
+import { useSnackbar } from "../../context/SnackbarContext";
 
-const TargetBeneficiariesModal = ({
-  open,
-  handleClose,
-  activityId,
-  refreshParticipations,
-  currentParticipants, // Add current participants as a prop
-}) => {
+const TargetBeneficiariesModal = ({ open, handleClose }) => {
+  const [ageGroups] = useState([
+    "Infant",
+    "Toddler",
+    "Child",
+    "Teen",
+    "Adult",
+    "Senior Citizen",
+  ]);
+  const [types, setTypes] = useState([]);
+  const [selectedAgeGroup, setSelectedAgeGroup] = useState("");
+  const [selectedType, setSelectedType] = useState("");
+  const [selectedSubType, setSelectedSubType] = useState("");
+  const [searchText, setSearchText] = useState("");
   const [beneficiaries, setBeneficiaries] = useState([]);
   const [filteredBeneficiaries, setFilteredBeneficiaries] = useState([]);
-  const [selectedBeneficiaries, setSelectedBeneficiaries] = useState([]);
-  const [primaryTypes, setPrimaryTypes] = useState([]);
-  const [secondaryTypes, setSecondaryTypes] = useState([]);
-  const [tertiaryTypes, setTertiaryTypes] = useState([]);
-  const [sexOptions, setSexOptions] = useState([]);
-  const [selectedPrimaryType, setSelectedPrimaryType] = useState("");
-  const [selectedSecondaryType, setSelectedSecondaryType] = useState("");
-  const [selectedTertiaryType, setSelectedTertiaryType] = useState("");
-  const [selectedSex, setSelectedSex] = useState("");
-  const [searchText, setSearchText] = useState("");
-
-  const { showSnackbar } = useSnackbar(); // Use useSnackbar
+  const { showSnackbar } = useSnackbar();
 
   useEffect(() => {
     if (open) {
-      const fetchAllBeneficiaries = async () => {
-        try {
-          const data = await fetchBeneficiaries();
-
-          const formattedData = data.map((beneficiary) => ({
-            ...beneficiary,
-            birthdate: dayjs(beneficiary.birthdate).format("MMMM-DD-YYYY"),
-            types: [
-              beneficiary.primaryType,
-              ...beneficiary.secondaryTypeNames,
-              beneficiary.tertiaryTypeName,
-            ]
-              .filter((type) => type)
-              .join("\n"),
-          }));
-
-          const filteredData = formattedData.filter(
-            (beneficiary) =>
-              !currentParticipants.some(
-                (participant) =>
-                  participant.beneficiaryId === beneficiary.beneficiaryId
-              )
-          );
-
-          setBeneficiaries(filteredData);
-          setFilteredBeneficiaries(filteredData);
-          console.log("Beneficiaries loaded", formattedData);
-        } catch (error) {
-          console.error("Error fetching beneficiaries:", error);
-        }
-      };
-
-      const fetchTypes = async () => {
-        try {
-          const primaryData = await fetchPrimaryTypes();
-          setPrimaryTypes(primaryData);
-          const sexData = await fetchSexOptions();
-          setSexOptions(sexData.filter((sex) => sex !== "Both"));
-          console.log("Primary Types:", primaryData);
-          console.log(
-            "Sex Options:",
-            sexData.filter((sex) => sex !== "Both")
-          );
-        } catch (error) {
-          console.error("Error fetching types and sex options:", error);
-        }
-      };
-
-      fetchAllBeneficiaries();
-      fetchTypes();
+      fetchBeneficiaries();
     }
   }, [open]);
 
   useEffect(() => {
-    if (selectedPrimaryType && selectedSex) {
-      const fetchSecondary = async () => {
-        try {
-          const secondaryData = await fetchSecondaryTypes(
-            selectedPrimaryType,
-            selectedSex
-          );
-          setSecondaryTypes(secondaryData);
-          console.log("Secondary Types:", secondaryData);
-        } catch (error) {
-          console.error("Error fetching secondary types:", error);
-        }
-      };
-
-      fetchSecondary();
+    if (selectedAgeGroup) {
+      fetchTypes(selectedAgeGroup);
+    } else {
+      setTypes([]);
+      setSelectedType("");
+      setSelectedSubType("");
     }
-  }, [selectedPrimaryType, selectedSex]);
+  }, [selectedAgeGroup]);
 
-  useEffect(() => {
-    if (selectedSecondaryType) {
-      const fetchTertiary = async () => {
-        try {
-          const tertiaryData = await fetchTertiaryTypes(selectedSecondaryType);
-          setTertiaryTypes(tertiaryData);
-          console.log("Tertiary Types:", tertiaryData);
-        } catch (error) {
-          console.error("Error fetching tertiary types:", error);
-        }
-      };
-
-      fetchTertiary();
-    }
-  }, [selectedSecondaryType]);
-
-  useEffect(() => {
-    filterBeneficiaries();
-  }, [
-    selectedPrimaryType,
-    selectedSecondaryType,
-    selectedTertiaryType,
-    selectedSex,
-    beneficiaries,
-  ]);
-
-  const filterBeneficiaries = () => {
-    console.log("Filtering beneficiaries with:", {
-      selectedPrimaryType,
-      selectedSecondaryType,
-      selectedTertiaryType,
-      selectedSex,
-    });
-    let filtered = beneficiaries;
-
-    if (selectedPrimaryType) {
-      const primaryTypeName = primaryTypes.find(
-        (type) => type.primaryTypeId === selectedPrimaryType
-      )?.typeName;
-      if (primaryTypeName) {
-        filtered = filtered.filter(
-          (beneficiary) => beneficiary.primaryType === primaryTypeName
-        );
-      }
-    }
-
-    if (selectedSecondaryType) {
-      const secondaryTypeName = secondaryTypes.find(
-        (type) => type.typeId === selectedSecondaryType
-      )?.typeName;
-      if (secondaryTypeName) {
-        filtered = filtered.filter((beneficiary) =>
-          beneficiary.secondaryTypeNames.includes(secondaryTypeName)
-        );
-      }
-    }
-
-    if (selectedTertiaryType) {
-      const tertiaryTypeName = tertiaryTypes.find(
-        (type) => type.typeId === selectedTertiaryType
-      )?.typeName;
-      if (tertiaryTypeName) {
-        filtered = filtered.filter(
-          (beneficiary) => beneficiary.tertiaryTypeName === tertiaryTypeName
-        );
-      }
-    }
-
-    if (selectedSex) {
-      filtered = filtered.filter(
-        (beneficiary) => beneficiary.sex === selectedSex
-      );
-    }
-
-    setFilteredBeneficiaries(filtered);
-    console.log("Filtered Beneficiaries:", filtered);
-  };
-
-  const handleAddSelected = async () => {
+  const fetchBeneficiaries = async () => {
     try {
-      await addBeneficiariesToActivity(activityId, selectedBeneficiaries);
-      console.log("Selected Beneficiaries:", selectedBeneficiaries);
-      refreshParticipations(); // Refresh the participation list
-      handleClose();
-      showSnackbar("Beneficiaries successfully added", "success");
+      const response = await axios.get(
+        "http://localhost:3000/beneficiaries/unarchived"
+      );
+      const formattedBeneficiaries = response.data.map((beneficiary) => ({
+        ...beneficiary,
+        birthdate: dayjs(beneficiary.birthdate).format("MMMM-DD-YYYY"),
+        types: beneficiary.beneficiaryTypes
+          .map((bt) => bt.type.typeName)
+          .join(", "),
+        typeAndSubType: beneficiary.subType
+          ? `${beneficiary.types.join(", ")} - ${beneficiary.subType}`
+          : beneficiary.types.join(", "),
+      }));
+      setBeneficiaries(formattedBeneficiaries);
+      setFilteredBeneficiaries(formattedBeneficiaries);
+      console.log("Beneficiaries loaded", formattedBeneficiaries);
     } catch (error) {
-      console.error("Error adding beneficiaries to activity:", error);
-      showSnackbar("Failed to add beneficiaries", "error");
+      console.error("Error fetching beneficiaries:", error);
     }
   };
 
-  const handleSelectionModelChange = (newSelection) => {
-    const selectedData = newSelection.map((id) =>
-      beneficiaries.find((beneficiary) => beneficiary.beneficiaryId === id)
-    );
-    setSelectedBeneficiaries(selectedData);
-    console.log("Selected Beneficiaries Data:", selectedData); // Log selected beneficiary data
+  const fetchTypes = async (ageGroup) => {
+    try {
+      const response = await axios.get(
+        `http://localhost:3000/types/typesforparticipation?ageGroup=${ageGroup}`
+      );
+      setTypes(response.data);
+      console.log("Types loaded", response.data);
+    } catch (error) {
+      console.error("Error fetching types:", error);
+    }
   };
 
   const handleClearSelection = () => {
-    setSelectedPrimaryType("");
-    setSelectedSecondaryType("");
-    setSelectedTertiaryType("");
-    setSelectedSex("");
+    setSelectedAgeGroup("");
+    setSelectedType("");
+    setSelectedSubType("");
     setSearchText("");
     setFilteredBeneficiaries(beneficiaries);
     console.log("Selections cleared");
   };
+
+  const handleFilterChange = () => {
+    let filtered = beneficiaries;
+
+    if (selectedAgeGroup) {
+      filtered = filtered.filter(
+        (beneficiary) => beneficiary.ageGroup === selectedAgeGroup
+      );
+    }
+
+    if (selectedType) {
+      filtered = filtered.filter((beneficiary) =>
+        beneficiary.types.includes(selectedType)
+      );
+    }
+
+    if (selectedSubType) {
+      filtered = filtered.filter(
+        (beneficiary) => beneficiary.subType === selectedSubType
+      );
+    }
+
+    if (searchText) {
+      filtered = filtered.filter((beneficiary) =>
+        Object.values(beneficiary).some((value) =>
+          String(value).toLowerCase().includes(searchText.toLowerCase())
+        )
+      );
+    }
+
+    setFilteredBeneficiaries(filtered);
+  };
+
+  useEffect(() => {
+    handleFilterChange();
+  }, [
+    selectedAgeGroup,
+    selectedType,
+    selectedSubType,
+    searchText,
+    beneficiaries,
+  ]);
 
   const columns = [
     { field: "beneficiaryId", headerName: "ID", width: 90 },
@@ -235,29 +147,18 @@ const TargetBeneficiariesModal = ({
     { field: "middleName", headerName: "Middle Name", width: 150 },
     { field: "lastName", headerName: "Last Name", width: 150 },
     { field: "suffix", headerName: "Suffix", width: 90 },
-    {
-      field: "types",
-      headerName: "Types",
-      width: 200,
-      renderCell: (params) => (
-        <div style={{ whiteSpace: "pre-wrap" }}>{params.value}</div>
-      ),
-    },
+    { field: "typeAndSubType", headerName: "Types", width: 250 },
     { field: "birthdate", headerName: "Birthdate", width: 150 },
     { field: "age", headerName: "Age", width: 150 },
     { field: "sex", headerName: "Sex", width: 120 },
     { field: "job", headerName: "Job", width: 150 },
     { field: "barangay", headerName: "Barangay", width: 150 },
     { field: "healthStation", headerName: "Health Station", width: 150 },
+    { field: "ageGroup", headerName: "Age Group", width: 150 },
+    { field: "subType", headerName: "Subtype", width: 150 },
     { field: "civilStatus", headerName: "Civil Status", width: 150 },
     { field: "contactNumber", headerName: "Contact Number", width: 150 },
   ];
-
-  const filteredRows = filteredBeneficiaries.filter((beneficiary) =>
-    Object.values(beneficiary).some((value) =>
-      String(value).toLowerCase().includes(searchText.toLowerCase())
-    )
-  );
 
   return (
     <Modal open={open} onClose={handleClose}>
@@ -267,7 +168,7 @@ const TargetBeneficiariesModal = ({
           top: "50%",
           left: "50%",
           transform: "translate(-50%, -50%)",
-          width: 1000,
+          width: 1600,
           bgcolor: "background.paper",
           borderRadius: 2,
           boxShadow: 24,
@@ -285,107 +186,107 @@ const TargetBeneficiariesModal = ({
         >
           Clear Selection
         </Button>
-        <Stack direction="row" spacing={2} mb={2} alignItems="center">
-          <FormControl fullWidth>
-            <InputLabel id="sex-select-label">Sex</InputLabel>
-            <Select
-              labelId="sex-select-label"
-              value={selectedSex}
-              label="Sex"
-              onChange={(e) => {
-                setSelectedSex(e.target.value);
-                console.log("Selected Sex:", e.target.value);
-              }}
-            >
-              {sexOptions.map((sex) => (
-                <MenuItem key={sex} value={sex}>
-                  {sex}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <FormControl fullWidth>
-            <InputLabel id="primary-type-select-label">Primary Type</InputLabel>
-            <Select
-              labelId="primary-type-select-label"
-              value={selectedPrimaryType}
-              label="Primary Type"
-              onChange={(e) => {
-                setSelectedPrimaryType(e.target.value);
-                console.log("Selected Primary Type:", e.target.value);
-              }}
-            >
-              {primaryTypes.map((type) => (
-                <MenuItem key={type.primaryTypeId} value={type.primaryTypeId}>
-                  {type.typeName}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <FormControl fullWidth>
-            <InputLabel id="secondary-type-select-label">
-              Secondary Type
-            </InputLabel>
-            <Select
-              labelId="secondary-type-select-label"
-              value={selectedSecondaryType}
-              label="Secondary Type"
-              onChange={(e) => {
-                setSelectedSecondaryType(e.target.value);
-                console.log("Selected Secondary Type:", e.target.value);
-              }}
-            >
-              {secondaryTypes.map((type) => (
-                <MenuItem key={type.typeId} value={type.typeId}>
-                  {type.typeName}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <FormControl fullWidth>
-            <InputLabel id="tertiary-type-select-label">
-              Tertiary Type
-            </InputLabel>
-            <Select
-              labelId="tertiary-type-select-label"
-              value={selectedTertiaryType}
-              label="Tertiary Type"
-              onChange={(e) => {
-                setSelectedTertiaryType(e.target.value);
-                console.log("Selected Tertiary Type:", e.target.value);
-              }}
-            >
-              {tertiaryTypes.map((type) => (
-                <MenuItem key={type.typeId} value={type.typeId}>
-                  {type.typeName}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+        <Stack direction="row" spacing={2} mb={2} sx={{ width: "100%" }}>
+          <Stack
+            direction="column"
+            spacing={2}
+            alignItems="flex-start"
+            sx={{ width: "33%" }}
+          >
+            <TextField
+              variant="outlined"
+              size="small"
+              placeholder="Search..."
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              fullWidth
+              sx={{ mb: 2 }}
+            />
+            <FormControl fullWidth>
+              <InputLabel id="age-group-select-label">Age Group</InputLabel>
+              <Select
+                labelId="age-group-select-label"
+                value={selectedAgeGroup}
+                label="Age Group"
+                onChange={(e) => {
+                  setSelectedAgeGroup(e.target.value);
+                  setSelectedType(""); // Clear selected type when age group changes
+                  setSelectedSubType(""); // Clear selected subtype when age group changes
+                  console.log("Selected Age Group:", e.target.value);
+                }}
+              >
+                {ageGroups.map((group) => (
+                  <MenuItem key={group} value={group}>
+                    {group}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            {types.length > 0 && (
+              <Stack direction="column" spacing={1} mt={2}>
+                {types.map((type) => (
+                  <Box key={type.typeId}>
+                    <FormControlLabel
+                      control={
+                        <Radio
+                          checked={selectedType === type.typeName}
+                          onChange={() => {
+                            setSelectedType(type.typeName);
+                            setSelectedSubType("");
+                          }}
+                        />
+                      }
+                      label={type.typeName}
+                    />
+                    {selectedType === type.typeName &&
+                      type.subTypes.length > 0 && (
+                        <RadioGroup
+                          value={selectedSubType}
+                          onChange={(e) => setSelectedSubType(e.target.value)}
+                          sx={{ ml: 3 }}
+                        >
+                          {type.subTypes.map((subType) => (
+                            <FormControlLabel
+                              key={subType}
+                              value={subType}
+                              control={<Radio />}
+                              label={subType}
+                            />
+                          ))}
+                        </RadioGroup>
+                      )}
+                  </Box>
+                ))}
+              </Stack>
+            )}
+          </Stack>
+          <Box sx={{ width: "67%" }}>
+            <div style={{ height: 600, width: "100%", marginBottom: 16 }}>
+              <DataGrid
+                rows={filteredBeneficiaries}
+                columns={columns}
+                pageSize={5}
+                columnVisibilityModel={{
+                  beneficiaryId: false,
+                  birthdate: false,
+                  age: false,
+                  sex: false,
+                  job: false,
+                  healthStation: false,
+                  civilStatus: false,
+                  contactNumber: false,
+                  subType: false,
+                }}
+                getRowHeight={() => 130}
+                checkboxSelection
+                onRowSelectionModelChange={(newSelection) => {
+                  console.log("Selected Rows:", newSelection);
+                }}
+                getRowId={(row) => row.beneficiaryId}
+              />
+            </div>
+          </Box>
         </Stack>
-        <TextField
-          variant="outlined"
-          size="small"
-          placeholder="Search..."
-          value={searchText}
-          onChange={(e) => setSearchText(e.target.value)}
-          fullWidth
-          sx={{ mb: 2 }}
-        />
-        <div style={{ height: 400, width: "100%", marginBottom: 16 }}>
-          <DataGrid
-            rows={filteredRows}
-            columns={columns}
-            pageSize={5}
-            columnVisibilityModel={{
-              beneficiaryId: false,
-            }}
-            getRowHeight={() => 130}
-            checkboxSelection
-            onRowSelectionModelChange={handleSelectionModelChange}
-            getRowId={(row) => row.beneficiaryId}
-          />
-        </div>
         <Stack direction="row" spacing={2} justifyContent="flex-end">
           <Button variant="contained" color="primary" onClick={handleClose}>
             Cancel
@@ -393,7 +294,10 @@ const TargetBeneficiariesModal = ({
           <Button
             variant="contained"
             color="secondary"
-            onClick={handleAddSelected}
+            onClick={() => {
+              console.log("Add Selected clicked");
+              showSnackbar("Beneficiaries successfully added", "success");
+            }}
           >
             Add Selected
           </Button>

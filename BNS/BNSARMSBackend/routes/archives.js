@@ -109,18 +109,15 @@ router.patch("/bns/restore/:id", async (req, res) => {
 // Endpoint to get archived beneficiary types
 router.get("/types", async (req, res) => {
   const { isArchived } = req.query;
-  const types = await prisma.type.findMany({
-    where: { isArchived: isArchived === "true" },
-    include: {
-      primaryTypes: {
-        include: {
-          primaryType: true,
-        },
-      },
-      parentType: true, // Include the parent type information
-    },
-  });
-  res.json(types);
+  try {
+    const types = await prisma.type.findMany({
+      where: { isArchived: isArchived === "true" },
+    });
+    res.json(types);
+  } catch (error) {
+    console.error("Error fetching types:", error);
+    res.status(500).json({ error: "Failed to fetch types" });
+  }
 });
 
 // Endpoint to restore archived beneficiary type
@@ -133,6 +130,7 @@ router.patch("/types/restore/:id", async (req, res) => {
     });
     res.json(restoredType);
   } catch (error) {
+    console.error("Error restoring type:", error);
     res.status(500).json({ error: "Failed to restore beneficiary type" });
   }
 });

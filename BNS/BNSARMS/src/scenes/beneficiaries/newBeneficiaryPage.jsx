@@ -1,4 +1,4 @@
-// NewBeneficiaryPage.jsx
+/* eslint-disable no-unused-vars */
 import { useState, useEffect } from "react";
 import {
   Box,
@@ -10,25 +10,17 @@ import {
   FormControl,
   Typography,
   Grid,
-  Checkbox,
+  Switch,
   FormControlLabel,
   RadioGroup,
   Radio,
   Alert,
 } from "@mui/material";
 import { useNavigate, useLocation } from "react-router-dom";
+import axios from "axios";
 import useAuthStore from "../../stores/authStore";
 import dayjs from "dayjs";
-import {
-  fetchSecondaryTypesByPrimarySex,
-  fetchTertiaryTypesBySecondary,
-} from "../../functions/forTypes";
-import {
-  createBeneficiary,
-  checkExistingBeneficiary,
-  updateBeneficiary,
-} from "../../functions/forBeneficiaries";
-import { useSnackbar } from "../../context/SnackbarContext"; // Import useSnackbar
+import { useSnackbar } from "../../context/SnackbarContext";
 
 const initialFormData = {
   firstName: "",
@@ -40,11 +32,11 @@ const initialFormData = {
   sex: "Male",
   job: "",
   birthdate: "",
-  primaryType: "",
+  ageGroup: "",
   civilStatus: "",
   contactNumber: "",
-  secondaryTypes: [],
-  tertiaryType: "",
+  types: [],
+  subType: "", // Corrected casing
 };
 
 const barangayOptions = [
@@ -79,45 +71,57 @@ const civilStatusOptions = [
   "Legally Separated",
 ];
 
+const parseSubtypes = (subtypesStringArray) => {
+  try {
+    return subtypesStringArray.map((subtype) => ({
+      typeId: subtype,
+      typeName: subtype,
+    }));
+  } catch (error) {
+    console.error("Error parsing subtypes:", error);
+    return [];
+  }
+};
+
 const NewBeneficiaryPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const beneficiary = location.state?.beneficiary || null;
   const { user } = useAuthStore();
-  const { showSnackbar } = useSnackbar(); // Use the snackbar context
+  const { showSnackbar } = useSnackbar();
+  const [existingBeneficiaryWarning, setExistingBeneficiaryWarning] =
+    useState("");
 
   const [formData, setFormData] = useState({
     ...initialFormData,
     barangay: user?.barangay || "Cannery Site",
   });
   const [age, setAge] = useState("");
-  const [secondaryTypes, setSecondaryTypes] = useState([]);
-  const [tertiaryTypes, setTertiaryTypes] = useState([]);
-  const [selectedSecondaryType, setSelectedSecondaryType] = useState("");
+  const [types, setTypes] = useState([]);
+  const [subtypes, setSubtypes] = useState([]);
+  const [selectedType, setSelectedType] = useState(null);
+  const [typeSubtypes, setTypeSubtypes] = useState({});
   const [errorMessage, setErrorMessage] = useState("");
 
-  useEffect(() => {
-    if (beneficiary) {
-      setFormData({
-        firstName: beneficiary.firstName,
-        middleName: beneficiary.middleName || "",
-        lastName: beneficiary.lastName,
-        suffix: beneficiary.suffix || "",
-        birthdate: beneficiary.birthdate
-          ? dayjs(beneficiary.birthdate).format("YYYY-MM-DD") // Format birthdate
-          : "",
-        barangay: beneficiary.barangay,
-        healthStation: beneficiary.healthStation,
-        sex: beneficiary.sex,
-        job: beneficiary.job,
-        primaryType: beneficiary.primaryType || "",
-        civilStatus: beneficiary.civilStatus || "",
-        contactNumber: beneficiary.contactNumber || "",
-        secondaryTypes: beneficiary.secondaryTypeIds || [],
-        tertiaryType: beneficiary.tertiaryTypeId || "",
-      });
+  const calculateAge = (birthdate) => {
+    if (!birthdate) return "";
+    const birth = dayjs(birthdate);
+    const today = dayjs();
+    const years = today.diff(birth, "year");
+    const months = today.diff(birth.add(years, "year"), "month");
+    const weeks = today.diff(birth.add(months, "month"), "week");
+    const days = today.diff(birth.add(weeks, "week"), "day");
+
+    if (years > 0) {
+      return `${years} Years and ${months} Months Old`;
+    } else if (months > 0) {
+      return `${months} Months Old`;
+    } else if (weeks > 0) {
+      return `${weeks} Weeks Old`;
+    } else {
+      return `${days} Days Old`;
     }
-  }, [beneficiary]);
+  };
 
   useEffect(() => {
     const calculateAge = (birthdate) => {
@@ -140,9 +144,7 @@ const NewBeneficiaryPage = () => {
       }
     };
 
-    setAge(calculateAge(formData.birthdate));
-
-    const determinePrimaryType = (birthdate) => {
+    const determineAgeGroup = (birthdate) => {
       if (!birthdate) return "";
       const birth = dayjs(birthdate);
       const today = dayjs();
@@ -156,109 +158,171 @@ const NewBeneficiaryPage = () => {
       return "Senior Citizen";
     };
 
-    const primaryType = determinePrimaryType(formData.birthdate);
-    setFormData((prev) => ({ ...prev, primaryType }));
+    setAge(calculateAge(formData.birthdate));
+    const ageGroup = determineAgeGroup(formData.birthdate);
+    setFormData((prev) => ({ ...prev, ageGroup }));
 
-    const fetchSecondary = async () => {
-      if (primaryType && formData.sex) {
-        const data = await fetchSecondaryTypesByPrimarySex(
-          primaryType,
-          formData.sex
-        );
-        setSecondaryTypes(data);
+    if (ageGroup && formData.sex) {
+      fetchTypes(ageGroup, formData.sex);
+    }
+  }, [formData.birthdate, formData.sex]);
 
-        if (beneficiary && beneficiary.secondaryTypeIds) {
-          const fetchedSecondaryTypeIds = data.map((type) => type.typeId);
-          setFormData((prev) => ({
-            ...prev,
-            secondaryTypes: beneficiary.secondaryTypeIds.filter((typeId) =>
-              fetchedSecondaryTypeIds.includes(typeId)
-            ),
-          }));
-
-          // Set the selected secondary type to trigger tertiary type fetching
-          if (beneficiary.secondaryTypeIds.length > 0) {
-            setSelectedSecondaryType(beneficiary.secondaryTypeIds[0]);
-          }
+  const checkExistingBeneficiary = async (firstName, middleName, lastName) => {
+    try {
+      const response = await axios.get(
+        "http://localhost:3000/beneficiaries/check-existing",
+        {
+          params: { firstName, middleName, lastName },
         }
+      );
+      if (response.data.exists) {
+        setExistingBeneficiaryWarning(
+          `Beneficiary already exists: ${response.data.beneficiary.firstName} ${response.data.beneficiary.middleName} ${response.data.beneficiary.lastName}`
+        );
+        showSnackbar(
+          `Beneficiary already exists: ${response.data.beneficiary.firstName} ${response.data.beneficiary.middleName} ${response.data.beneficiary.lastName}`,
+          "error"
+        );
+      } else {
+        setExistingBeneficiaryWarning("");
       }
-    };
-
-    fetchSecondary();
-  }, [formData.birthdate, formData.sex, beneficiary]);
+    } catch (error) {
+      console.error("Error checking existing beneficiary:", error);
+    }
+  };
 
   useEffect(() => {
-    const fetchTertiary = async () => {
-      if (selectedSecondaryType) {
-        const data = await fetchTertiaryTypesBySecondary(selectedSecondaryType);
-        setTertiaryTypes(data);
+    if (beneficiary) {
+      console.log("Beneficiary data on load:", beneficiary);
+      setFormData({
+        firstName: beneficiary.firstName,
+        middleName: beneficiary.middleName || "",
+        lastName: beneficiary.lastName,
+        suffix: beneficiary.suffix || "",
+        birthdate: beneficiary.birthdate
+          ? dayjs(beneficiary.birthdate).format("YYYY-MM-DD")
+          : "",
+        barangay: beneficiary.barangay,
+        healthStation: beneficiary.healthStation,
+        sex: beneficiary.sex,
+        job: beneficiary.job,
+        ageGroup: beneficiary.ageGroup || "",
+        civilStatus: beneficiary.civilStatus || "",
+        contactNumber: beneficiary.contactNumber || "",
+        types: Array.isArray(beneficiary.beneficiaryTypes)
+          ? beneficiary.beneficiaryTypes.map((type) => type.typeId)
+          : [], // Ensure types is an array
+        subType: beneficiary.subType || "", // Set subtype
+      });
 
-        if (beneficiary && beneficiary.tertiaryTypeId) {
-          const fetchedTertiaryTypeIds = data.map((type) => type.typeId);
-          if (fetchedTertiaryTypeIds.includes(beneficiary.tertiaryTypeId)) {
-            setFormData((prev) => ({
-              ...prev,
-              tertiaryType: beneficiary.tertiaryTypeId,
-            }));
+      // Fetch types and subtypes for the beneficiary's age group and sex
+      const fetchTypesAndSubtypes = async () => {
+        try {
+          const response = await axios.get(
+            `http://localhost:3000/beneficiaries/types?ageGroup=${beneficiary.ageGroup}&sex=${beneficiary.sex}`
+          );
+          setTypes(response.data);
+          console.log("Fetched types:", response.data);
+
+          // Fetch subtypes for each type
+          const subtypesData = {};
+          for (const type of response.data) {
+            const subtypesResponse = await axios.get(
+              `http://localhost:3000/beneficiaries/subtypes?typeId=${type.typeId}`
+            );
+            subtypesData[type.typeId] = parseSubtypes(subtypesResponse.data);
           }
+          setTypeSubtypes(subtypesData);
+          console.log("Fetched subtypes:", subtypesData);
+
+          // Set the selected type if there is a subtype
+          if (beneficiary.subType) {
+            const selectedType = response.data.find((type) =>
+              subtypesData[type.typeId].some(
+                (subtype) => subtype.typeName === beneficiary.subType
+              )
+            );
+            setSelectedType(selectedType?.typeId || null);
+          }
+        } catch (error) {
+          console.error("Error fetching types and subtypes:", error);
         }
-      }
-    };
+      };
 
-    fetchTertiary();
-  }, [selectedSecondaryType, beneficiary]);
+      fetchTypesAndSubtypes();
+    }
+  }, [beneficiary]);
 
-  const handleChange = async (event) => {
+  const fetchTypes = async (ageGroup, sex) => {
+    try {
+      const response = await axios.get(
+        `http://localhost:3000/beneficiaries/types?ageGroup=${ageGroup}&sex=${sex}`
+      );
+      setTypes(response.data);
+      setSubtypes([]);
+      setSelectedType(null);
+    } catch (error) {
+      console.error("Error fetching types:", error);
+    }
+  };
+
+  const fetchSubtypes = async (typeId) => {
+    try {
+      const response = await axios.get(
+        `http://localhost:3000/beneficiaries/subtypes?typeId=${typeId}`
+      );
+      const parsedSubtypes = parseSubtypes(response.data);
+      setTypeSubtypes((prev) => ({ ...prev, [typeId]: parsedSubtypes }));
+    } catch (error) {
+      console.error("Error fetching subtypes:", error);
+      setTypeSubtypes((prev) => ({ ...prev, [typeId]: [] }));
+    }
+  };
+
+  const handleChange = (event) => {
     const { name, value } = event.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
 
-    if (["firstName", "middleName", "lastName", "suffix"].includes(name)) {
-      try {
-        const exists = await checkExistingBeneficiary({
-          firstName: name === "firstName" ? value : formData.firstName,
-          middleName: name === "middleName" ? value : formData.middleName,
-          lastName: name === "lastName" ? value : formData.lastName,
-          suffix: name === "suffix" ? value : formData.suffix,
-        });
-
-        if (exists) {
-          setErrorMessage("Beneficiary already exists");
-        } else {
-          setErrorMessage("");
-        }
-      } catch (error) {
-        console.error("Failed to check beneficiary existence:", error);
-      }
+    if (name === "firstName" || name === "middleName" || name === "lastName") {
+      checkExistingBeneficiary(
+        name === "firstName" ? value : formData.firstName,
+        name === "middleName" ? value : formData.middleName,
+        name === "lastName" ? value : formData.lastName
+      );
     }
   };
 
-  const handleCheckboxChange = async (event) => {
-    const { name, checked } = event.target;
-    const nameAsNumber = parseInt(name, 10);
+  const handleTypeChange = (event) => {
+    const { value, checked } = event.target;
+    const selectedTypeId = parseInt(value, 10);
+
     setFormData((prev) => {
-      const newSecondaryTypes = checked
-        ? [...prev.secondaryTypes, nameAsNumber]
-        : prev.secondaryTypes.filter((type) => type !== nameAsNumber);
-      return { ...prev, secondaryTypes: newSecondaryTypes };
+      const updatedTypes = checked
+        ? [...prev.types, selectedTypeId]
+        : prev.types.filter((typeId) => typeId !== selectedTypeId);
+
+      if (checked) {
+        fetchSubtypes(selectedTypeId);
+        setSelectedType(selectedTypeId);
+      } else {
+        if (selectedType === selectedTypeId) {
+          setSelectedType(null);
+        }
+        return { ...prev, types: updatedTypes, subType: "" }; // Corrected casing
+      }
+
+      return { ...prev, types: updatedTypes };
     });
-
-    if (checked) {
-      const data = await fetchTertiaryTypesBySecondary(nameAsNumber);
-      setTertiaryTypes(data);
-      setSelectedSecondaryType(nameAsNumber);
-    } else {
-      setTertiaryTypes([]);
-      setSelectedSecondaryType("");
-    }
   };
 
-  const handleRadioChange = (event) => {
+  const handleSubtypeChange = (event) => {
     const { value } = event.target;
-    setFormData((prev) => ({ ...prev, tertiaryType: parseInt(value, 10) }));
+    console.log("Selected subType:", value); // Log the selected subType
+    setFormData((prev) => ({ ...prev, subType: value })); // Corrected casing
   };
 
-  const clearTertiarySelection = () => {
-    setFormData((prev) => ({ ...prev, tertiaryType: "" }));
+  const handleClearSelection = () => {
+    setFormData((prev) => ({ ...prev, subtype: "" }));
   };
 
   const handleCancel = () => {
@@ -268,34 +332,40 @@ const NewBeneficiaryPage = () => {
   const handleSave = async () => {
     if (errorMessage) return;
 
+    const ageValue = calculateAge(formData.birthdate); // Calculate age before saving
+    console.log("Form data before saving:", { ...formData, age: ageValue }); // Log form data
+
     try {
-      await createBeneficiary({
-        ...formData,
-        healthStation: String(formData.healthStation),
-        age,
-      });
+      const response = await axios.post(
+        "http://localhost:3000/beneficiaries",
+        { ...formData, age: ageValue } // Include age in the form data
+      );
+      console.log("Beneficiary successfully added:", response.data);
       showSnackbar("Beneficiary successfully added", "success");
       navigate("/app/beneficiaries");
     } catch (error) {
-      console.error("Failed to save beneficiary:", error);
-      showSnackbar("Failed to add beneficiary", "error");
+      console.error("Error saving beneficiary:", error);
+      showSnackbar("Error saving beneficiary", "error");
     }
   };
 
   const handleUpdate = async () => {
     if (errorMessage) return;
 
+    const ageValue = calculateAge(formData.birthdate); // Calculate age before updating
+    console.log("Form data before updating:", { ...formData, age: ageValue }); // Log form data
+
     try {
-      await updateBeneficiary(beneficiary.beneficiaryId, {
-        ...formData,
-        healthStation: String(formData.healthStation),
-        age,
-      });
+      const response = await axios.put(
+        `http://localhost:3000/beneficiaries/${beneficiary.beneficiaryId}`,
+        { ...formData, age: ageValue } // Include age in the form data
+      );
+      console.log("Beneficiary successfully updated:", response.data);
       showSnackbar("Beneficiary successfully updated", "success");
       navigate("/app/beneficiaries");
     } catch (error) {
-      console.error("Failed to update beneficiary:", error);
-      showSnackbar("Failed to update beneficiary", "error");
+      console.error("Error updating beneficiary:", error);
+      showSnackbar("Error updating beneficiary", "error");
     }
   };
 
@@ -307,6 +377,16 @@ const NewBeneficiaryPage = () => {
       {errorMessage && <Alert severity="error">{errorMessage}</Alert>}
       <form noValidate autoComplete="off">
         <Grid container spacing={2} direction="column">
+          {existingBeneficiaryWarning && (
+            <Typography
+              color="error"
+              variant="body1"
+              gutterBottom
+              sx={{ ml: 2 }}
+            >
+              {existingBeneficiaryWarning}
+            </Typography>
+          )}
           <Grid item xs={12}>
             <TextField
               autoFocus
@@ -358,7 +438,6 @@ const NewBeneficiaryPage = () => {
                 variant="outlined"
                 value={formData.suffix}
                 onChange={handleChange}
-                required
               />
             </Grid>
           </Grid>
@@ -412,12 +491,12 @@ const NewBeneficiaryPage = () => {
             <Grid item xs={4}>
               <TextField
                 margin="dense"
-                name="primaryType"
+                name="ageGroup"
                 label="Age Group"
                 type="text"
                 fullWidth
                 variant="outlined"
-                value={formData.primaryType}
+                value={formData.ageGroup}
                 InputProps={{
                   readOnly: true,
                 }}
@@ -425,46 +504,54 @@ const NewBeneficiaryPage = () => {
               />
             </Grid>
           </Grid>
+
+          {/* Types switches */}
           <Grid item xs={12}>
             <Typography variant="h6">Select Types</Typography>
-            {secondaryTypes.map((type) => (
-              <FormControlLabel
-                key={type.typeId}
-                control={
-                  <Checkbox
-                    checked={formData.secondaryTypes.includes(type.typeId)}
-                    onChange={handleCheckboxChange}
-                    name={type.typeId.toString()}
-                  />
-                }
-                label={type.typeName}
-              />
+            {types.map((type) => (
+              <Box key={type.typeId} mb={2}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={formData.types.includes(type.typeId)}
+                      onChange={handleTypeChange}
+                      value={type.typeId.toString()}
+                      color="success"
+                    />
+                  }
+                  label={type.typeName}
+                />
+                {/* Display subtypes if type is selected */}
+                {formData.types.includes(type.typeId) &&
+                  typeSubtypes[type.typeId]?.length > 0 && (
+                    <Box ml={4}>
+                      <RadioGroup
+                        name="subtype"
+                        value={formData.subType} // Reflect selected subtype
+                        onChange={handleSubtypeChange}
+                      >
+                        {typeSubtypes[type.typeId].map((subtype) => (
+                          <FormControlLabel
+                            key={subtype.typeId}
+                            value={subtype.typeId}
+                            control={<Radio />}
+                            label={subtype.typeName}
+                          />
+                        ))}
+                      </RadioGroup>
+                      <Button
+                        size="small"
+                        color="primary"
+                        onClick={handleClearSelection}
+                      >
+                        Clear selection
+                      </Button>
+                    </Box>
+                  )}
+              </Box>
             ))}
           </Grid>
-          {selectedSecondaryType && (
-            <Grid item xs={12}>
-              <Typography variant="h6"></Typography>
-              <RadioGroup
-                name="tertiaryType"
-                value={formData.tertiaryType}
-                onChange={handleRadioChange}
-              >
-                {tertiaryTypes.map((type) => (
-                  <FormControlLabel
-                    key={type.typeId}
-                    value={type.typeId.toString()}
-                    control={<Radio />}
-                    label={type.typeName}
-                  />
-                ))}
-              </RadioGroup>
-              {formData.tertiaryType && (
-                <Button onClick={clearTertiarySelection} color="primary">
-                  Clear Selection
-                </Button>
-              )}
-            </Grid>
-          )}
+
           <Grid item xs={12}>
             <FormControl fullWidth margin="dense" required>
               <InputLabel id="barangay-label">Barangay</InputLabel>
@@ -529,7 +616,6 @@ const NewBeneficiaryPage = () => {
               variant="outlined"
               value={formData.contactNumber}
               onChange={handleChange}
-              required
             />
           </Grid>
           <Grid item xs={12}>
@@ -542,7 +628,6 @@ const NewBeneficiaryPage = () => {
               variant="outlined"
               value={formData.job}
               onChange={handleChange}
-              required
             />
           </Grid>
         </Grid>

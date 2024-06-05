@@ -91,4 +91,24 @@ router.patch("/mark-attended", async (req, res) => {
   }
 });
 
+router.get("/typesforparticipation", async (req, res) => {
+  try {
+    const types = await prisma.type.findMany({
+      where: {
+        isArchived: false,
+      },
+      select: {
+        typeId: true,
+        typeName: true,
+        subTypes: true,
+      },
+    });
+
+    res.status(200).json(types);
+  } catch (error) {
+    console.error("Error fetching types:", error);
+    res.status(500).json({ error: "Internal Server Error for Types" });
+  }
+});
+
 module.exports = router;

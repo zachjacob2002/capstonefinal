@@ -370,6 +370,11 @@ const Activities = () => {
           getRowHeight={() => 70}
           getRowId={(row) => row.id} // Ensure each row has a unique id
           onRowClick={(params) => navigate(`/app/activities/view/${params.id}`)}
+          sx={{
+            "& .MuiDataGrid-columnHeaderTitle": {
+              fontWeight: "bold",
+            },
+          }}
         />
       </Box>
       <Dialog

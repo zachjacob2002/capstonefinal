@@ -452,6 +452,11 @@ const Reports = () => {
           getRowId={(row) => row.reportId}
           getRowHeight={() => 70}
           onRowClick={handleRowClick}
+          sx={{
+            "& .MuiDataGrid-columnHeaderTitle": {
+              fontWeight: "bold",
+            },
+          }}
         />
       </Box>
 

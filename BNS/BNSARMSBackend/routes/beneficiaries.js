@@ -1,10 +1,11 @@
+// beneficiaries.js
+
 const express = require("express");
 const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
 const router = express.Router(); // Initialize the router
 
-// POST endpoint for creating a new beneficiary
-// POST endpoint for creating a new beneficiary
+// POST endpoint to add a new beneficiary
 router.post("/", async (req, res) => {
   const {
     firstName,
@@ -12,33 +13,21 @@ router.post("/", async (req, res) => {
     lastName,
     suffix,
     birthdate,
-    barangay,
-    healthStation,
     sex,
     job,
-    primaryType,
+    barangay,
+    healthStation,
+    ageGroup,
+    subType, // Ensure subType is included
     civilStatus,
     contactNumber,
-    secondaryTypes,
-    tertiaryType,
+    age, // Include age in the request body
+    types, // Include types in the request body
   } = req.body;
 
+  console.log("Request body:", req.body); // Log request body
+
   try {
-    // Calculate age
-    const calculateAge = (birthdate) => {
-      const birth = new Date(birthdate);
-      const today = new Date();
-      let years = today.getFullYear() - birth.getFullYear();
-      const months = today.getMonth() - birth.getMonth();
-      if (months < 0 || (months === 0 && today.getDate() < birth.getDate())) {
-        years--;
-      }
-      return `${years} Years`;
-    };
-
-    const age = calculateAge(birthdate);
-
-    // Create the new beneficiary
     const newBeneficiary = await prisma.beneficiary.create({
       data: {
         firstName,
@@ -46,37 +35,84 @@ router.post("/", async (req, res) => {
         lastName,
         suffix,
         birthdate: new Date(birthdate),
-        age,
-        barangay,
-        healthStation: String(healthStation), // Convert to string
         sex,
         job,
-        primaryType,
+        barangay,
+        healthStation: healthStation.toString(), // Convert healthStation to string
+        ageGroup,
+        subType, // Save the subType
         civilStatus,
         contactNumber,
-        beneficiaryTypes: {
-          create: [
-            ...secondaryTypes.map((typeId) => ({
-              typeId,
-            })),
-            ...(tertiaryType ? [{ typeId: tertiaryType }] : []),
-          ],
-        },
+        age, // Save the age
       },
     });
 
+    // Handle beneficiary types
+    await prisma.beneficiaryTypes.createMany({
+      data: types.map((typeId) => ({
+        beneficiaryId: newBeneficiary.beneficiaryId,
+        typeId,
+      })),
+    });
+
+    console.log("New Beneficiary added:", newBeneficiary);
     res.status(201).json(newBeneficiary);
   } catch (error) {
-    console.error("Error creating beneficiary:", error);
+    console.error("Error adding new beneficiary:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
-// GET endpoint to fetch all unarchived beneficiaries
-router.get("/", async (req, res) => {
+// GET endpoint to fetch types based on age group and sex
+router.get("/types", async (req, res) => {
+  const { ageGroup, sex } = req.query;
+
+  try {
+    const types = await prisma.type.findMany({
+      where: {
+        ageGroups: {
+          has: ageGroup,
+        },
+        sex: {
+          has: sex,
+        },
+      },
+    });
+    res.status(200).json(types);
+  } catch (error) {
+    console.error("Error fetching types:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+// GET endpoint to fetch subtypes based on typeId
+router.get("/subtypes", async (req, res) => {
+  const { typeId } = req.query;
+
+  try {
+    const type = await prisma.type.findUnique({
+      where: {
+        typeId: parseInt(typeId),
+      },
+    });
+
+    if (type) {
+      res.status(200).json(type.subTypes);
+    } else {
+      res.status(404).json({ error: "Type not found" });
+    }
+  } catch (error) {
+    console.error("Error fetching subtypes:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+router.get("/unarchived", async (req, res) => {
   try {
     const beneficiaries = await prisma.beneficiary.findMany({
-      where: { isArchived: false },
+      where: {
+        isArchived: false,
+      },
       include: {
         beneficiaryTypes: {
           include: {
@@ -87,150 +123,120 @@ router.get("/", async (req, res) => {
     });
 
     const formattedBeneficiaries = beneficiaries.map((beneficiary) => ({
-      beneficiaryId: beneficiary.beneficiaryId,
-      firstName: beneficiary.firstName,
-      middleName: beneficiary.middleName,
-      lastName: beneficiary.lastName,
-      suffix: beneficiary.suffix,
-      birthdate: beneficiary.birthdate,
-      age: beneficiary.age,
-      sex: beneficiary.sex,
-      job: beneficiary.job,
-      barangay: beneficiary.barangay,
-      healthStation: beneficiary.healthStation,
-      primaryType: beneficiary.primaryType,
-      civilStatus: beneficiary.civilStatus,
-      contactNumber: beneficiary.contactNumber,
-      secondaryTypeIds: beneficiary.beneficiaryTypes
-        .filter((bt) => bt.type.typeCategory === "Secondary")
-        .map((bt) => bt.typeId),
-      secondaryTypeNames: beneficiary.beneficiaryTypes
-        .filter((bt) => bt.type.typeCategory === "Secondary")
-        .map((bt) => bt.type.typeName),
-      tertiaryTypeId: beneficiary.beneficiaryTypes.find(
-        (bt) => bt.type.typeCategory === "Tertiary"
-      )?.typeId,
-      tertiaryTypeName:
-        beneficiary.beneficiaryTypes.find(
-          (bt) => bt.type.typeCategory === "Tertiary"
-        )?.type.typeName || "",
+      ...beneficiary,
+      types: beneficiary.beneficiaryTypes.map((bt) => bt.type.typeName),
     }));
 
     res.status(200).json(formattedBeneficiaries);
   } catch (error) {
-    console.error("Error fetching beneficiaries:", error);
-    res.status(500).json({ error: "Internal Server Error" });
-  }
-});
-// GET endpoint to check if a beneficiary exists
-router.get("/exists", async (req, res) => {
-  const { firstName, middleName, lastName, suffix } = req.query;
-
-  try {
-    const beneficiary = await prisma.beneficiary.findFirst({
-      where: {
-        firstName,
-        middleName,
-        lastName,
-        suffix,
-      },
-    });
-
-    if (beneficiary) {
-      return res.status(200).json({ exists: true });
-    } else {
-      return res.status(200).json({ exists: false });
-    }
-  } catch (error) {
-    console.error("Error checking beneficiary existence:", error);
+    console.error("Error fetching unarchived beneficiaries:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
-// PATCH endpoint for archiving a beneficiary
-router.patch("/archive/:id", async (req, res) => {
-  const { id } = req.params;
-
-  try {
-    const archivedBeneficiary = await prisma.beneficiary.update({
-      where: { beneficiaryId: parseInt(id) },
-      data: { isArchived: true },
-    });
-
-    res.status(200).json(archivedBeneficiary);
-  } catch (error) {
-    console.error("Error archiving beneficiary:", error);
-    res.status(500).json({ error: "Internal Server Error" });
-  }
-});
-
-// PATCH endpoint for updating a beneficiary
-router.patch("/:id", async (req, res) => {
-  const { id } = req.params;
+// PUT endpoint to update a beneficiary
+router.put("/:beneficiaryId", async (req, res) => {
   const {
     firstName,
     middleName,
     lastName,
     suffix,
     birthdate,
-    barangay,
-    healthStation,
     sex,
     job,
-    primaryType,
+    barangay,
+    healthStation,
+    ageGroup,
+    subType, // Ensure subType is included
     civilStatus,
     contactNumber,
-    secondaryTypes,
-    tertiaryType,
+    age, // Include age in the request body
+    types, // Include types in the request body
   } = req.body;
+  const { beneficiaryId } = req.params;
+
+  console.log("Request body for update:", req.body); // Log request body
 
   try {
-    // Calculate age
-    const calculateAge = (birthdate) => {
-      const birth = new Date(birthdate);
-      const today = new Date();
-      let years = today.getFullYear() - birth.getFullYear();
-      const months = today.getMonth() - birth.getMonth();
-      if (months < 0 || (months === 0 && today.getDate() < birth.getDate())) {
-        years--;
-      }
-      return `${years} Years`;
-    };
-
-    const age = calculateAge(birthdate);
-
-    // Update the beneficiary
     const updatedBeneficiary = await prisma.beneficiary.update({
-      where: { beneficiaryId: parseInt(id) },
+      where: { beneficiaryId: parseInt(beneficiaryId) },
       data: {
         firstName,
         middleName,
         lastName,
         suffix,
         birthdate: new Date(birthdate),
-        age,
-        barangay,
-        healthStation: String(healthStation), // Convert to string
         sex,
         job,
-        primaryType,
+        barangay,
+        healthStation: healthStation.toString(), // Convert healthStation to string
+        ageGroup,
+        subType, // Save the subType
         civilStatus,
         contactNumber,
-        beneficiaryTypes: {
-          deleteMany: {}, // Delete existing types
-          create: [
-            ...secondaryTypes.map((typeId) => ({
-              typeId,
-            })),
-            ...(tertiaryType ? [{ typeId: tertiaryType }] : []),
-          ],
-        },
+        age, // Save the age
       },
     });
 
+    // Update beneficiary types
+    await prisma.beneficiaryTypes.deleteMany({
+      where: { beneficiaryId: parseInt(beneficiaryId) },
+    });
+
+    await prisma.beneficiaryTypes.createMany({
+      data: types.map((typeId) => ({
+        beneficiaryId: parseInt(beneficiaryId),
+        typeId,
+      })),
+    });
+
+    console.log("Beneficiary successfully updated:", updatedBeneficiary);
     res.status(200).json(updatedBeneficiary);
   } catch (error) {
     console.error("Error updating beneficiary:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+// GET endpoint to check if a beneficiary exists based on first, middle, and last name
+router.get("/check-existing", async (req, res) => {
+  const { firstName, middleName, lastName } = req.query;
+
+  try {
+    const existingBeneficiary = await prisma.beneficiary.findFirst({
+      where: {
+        firstName,
+        middleName,
+        lastName,
+      },
+    });
+
+    if (existingBeneficiary) {
+      res.status(200).json({ exists: true, beneficiary: existingBeneficiary });
+    } else {
+      res.status(200).json({ exists: false });
+    }
+  } catch (error) {
+    console.error("Error checking existing beneficiary:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+router.patch("/archive/:beneficiaryId", async (req, res) => {
+  const { beneficiaryId } = req.params;
+
+  try {
+    const archivedBeneficiary = await prisma.beneficiary.update({
+      where: { beneficiaryId: parseInt(beneficiaryId) },
+      data: {
+        isArchived: true,
+      },
+    });
+
+    console.log("Beneficiary successfully archived:", archivedBeneficiary);
+    res.status(200).json(archivedBeneficiary);
+  } catch (error) {
+    console.error("Error archiving beneficiary:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
 });

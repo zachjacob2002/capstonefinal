@@ -14,7 +14,6 @@ import {
 } from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
 import Header from "../../components/Header";
-import { fetchAllTypes } from "../../functions/forTypes";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import ArchiveIcon from "@mui/icons-material/Archive"; // Changed the icon to ArchiveIcon
@@ -32,8 +31,8 @@ export const ViewTypes = () => {
   useEffect(() => {
     const fetchTypes = async () => {
       try {
-        const data = await fetchAllTypes();
-        setTypes(data);
+        const response = await axios.get("http://localhost:3000/types");
+        setTypes(response.data);
       } catch (error) {
         console.error("Error fetching types:", error);
       }
@@ -60,7 +59,7 @@ export const ViewTypes = () => {
     if (!typeToArchive) return;
 
     axios
-      .patch(`http://localhost:3000/types/types/${typeToArchive.typeId}`)
+      .patch(`http://localhost:3000/types/archive/${typeToArchive.typeId}`)
       .then(() => {
         setTypes((prevTypes) =>
           prevTypes.filter((t) => t.typeId !== typeToArchive.typeId)
@@ -84,20 +83,12 @@ export const ViewTypes = () => {
   };
 
   const filteredTypes = useMemo(() => {
-    const sortedTypes = [...types].sort((a, b) => {
-      if (a.typeCategory === "Secondary" && b.typeCategory !== "Secondary") {
-        return -1;
-      }
-      if (a.typeCategory !== "Secondary" && b.typeCategory === "Secondary") {
-        return 1;
-      }
-      return a.typeName.localeCompare(b.typeName);
-    });
-
-    return sortedTypes.filter(
+    return types.filter(
       (type) =>
         type.typeName.toLowerCase().includes(searchText) ||
-        type.typeCategory.toLowerCase().includes(searchText)
+        type.ageGroups.join(", ").toLowerCase().includes(searchText) ||
+        type.sex.join(", ").toLowerCase().includes(searchText) ||
+        type.subTypes.join(", ").toLowerCase().includes(searchText)
     );
   }, [types, searchText]);
 
@@ -119,25 +110,23 @@ export const ViewTypes = () => {
     },
     { field: "typeId", headerName: "ID", width: 90, hide: true },
     { field: "typeName", headerName: "Type Name", width: 150 },
-    { field: "typeCategory", headerName: "Type Category", width: 150 },
     {
-      field: "primaryTypes",
-      headerName: "Age Group Referenced",
+      field: "ageGroups",
+      headerName: "Age Groups",
       width: 200,
-      valueGetter: (params) =>
-        params.row.primaryTypes.length > 0
-          ? params.row.primaryTypes
-              .map((pt) => pt.primaryType.typeName)
-              .join(", ")
-          : "N/A",
+      valueGetter: (params) => params.row.ageGroups.join(", "),
     },
-    { field: "sex", headerName: "Sex", width: 120 },
     {
-      field: "parentType",
-      headerName: "Secondary Type Referenced",
+      field: "sex",
+      headerName: "Sex",
       width: 150,
-      valueGetter: (params) =>
-        params.row.parentType ? params.row.parentType.typeName : "N/A",
+      valueGetter: (params) => params.row.sex.join(", "),
+    },
+    {
+      field: "subTypes",
+      headerName: "Sub Types",
+      width: 200,
+      valueGetter: (params) => params.row.subTypes.join(", "),
     },
   ];
 
@@ -147,7 +136,7 @@ export const ViewTypes = () => {
         <Header title="Beneficiary Types" subtitle="Manage Beneficiary Types" />
         <Box display="flex">
           <TextField
-            label="Search Types"
+            label="Search Beneficiary Types"
             variant="outlined"
             size="small"
             sx={{ mr: 2 }}
@@ -171,6 +160,14 @@ export const ViewTypes = () => {
             pageSize={5}
             getRowId={(row) => row.typeId}
             onRowClick={handleRowClick}
+            sx={{
+              "& .MuiDataGrid-columnHeaderTitle": {
+                fontWeight: "bold",
+              },
+            }}
+            columnVisibilityModel={{
+              typeId: false,
+            }}
           />
         </div>
       </Box>

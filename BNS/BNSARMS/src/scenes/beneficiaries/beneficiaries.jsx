@@ -13,7 +13,7 @@ import ArchiveIcon from "@mui/icons-material/Archive";
 import Header from "../../components/Header";
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
-import { fetchBeneficiaries } from "../../functions/forBeneficiaries";
+import { fetchUnarchivedBeneficiaries } from "../../functions/forBeneficiaries";
 import dayjs from "dayjs"; // Import dayjs for date formatting
 import duration from "dayjs/plugin/duration"; // Import duration plugin for age calculation
 import axios from "axios";
@@ -52,20 +52,17 @@ const Beneficiaries = () => {
   useEffect(() => {
     const loadBeneficiaries = async () => {
       try {
-        const data = await fetchBeneficiaries();
+        const data = await fetchUnarchivedBeneficiaries();
 
         // Format the data to include secondary and tertiary types and combine them with primary type
         const formattedData = data.map((beneficiary) => ({
           ...beneficiary,
           birthdate: dayjs(beneficiary.birthdate).format("MMMM-DD-YYYY"), // Format birthdate
-          age: calculateAge(beneficiary.birthdate),
-          types: [
-            beneficiary.primaryType,
-            ...beneficiary.secondaryTypeNames,
-            beneficiary.tertiaryTypeName,
-          ]
-            .filter((type) => type) // Remove empty or undefined types
-            .join("\n"), // Join all type names with a newline for multiline display
+          age: calculateAge(beneficiary.birthdate).replace(/\n/g, "<br>"), // Replace \n with <br> for display
+          types: Array.isArray(beneficiary.types)
+            ? beneficiary.types.join("<br>") // Join types array into a string with <br> for display
+            : "",
+          subType: beneficiary.subType || "", // Include subType
         }));
 
         setBeneficiaries(formattedData);
@@ -129,12 +126,33 @@ const Beneficiaries = () => {
     { field: "lastName", headerName: "Last Name", width: 150 },
     { field: "suffix", headerName: "Suffix", width: 90 },
     { field: "birthdate", headerName: "Birthdate", width: 150 },
-    { field: "age", headerName: "Age", width: 150 },
+    {
+      field: "age",
+      headerName: "Age",
+      width: 150,
+      renderCell: (params) => (
+        <div
+          style={{ whiteSpace: "pre-wrap" }}
+          dangerouslySetInnerHTML={{ __html: params.value }}
+        />
+      ),
+    },
     { field: "sex", headerName: "Sex", width: 120 },
     {
       field: "types",
       headerName: "Types",
       width: 200,
+      renderCell: (params) => (
+        <div
+          style={{ whiteSpace: "pre-wrap" }}
+          dangerouslySetInnerHTML={{ __html: params.value }}
+        />
+      ),
+    },
+    {
+      field: "subType",
+      headerName: "SubType",
+      width: 150,
       renderCell: (params) => (
         <div style={{ whiteSpace: "pre-wrap" }}>{params.value}</div>
       ),
@@ -189,6 +207,11 @@ const Beneficiaries = () => {
               beneficiaryId: false,
             }}
             onRowClick={handleRowClick}
+            sx={{
+              "& .MuiDataGrid-columnHeaderTitle": {
+                fontWeight: "bold",
+              },
+            }}
           />
         </div>
       </Box>

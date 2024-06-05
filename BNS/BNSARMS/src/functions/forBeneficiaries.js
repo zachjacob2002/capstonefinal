@@ -48,3 +48,17 @@ export const updateBeneficiary = async (beneficiaryId, beneficiaryData) => {
     throw error;
   }
 };
+
+// forBeneficiaries.js
+
+export const fetchUnarchivedBeneficiaries = async () => {
+  try {
+    const response = await axios.get(
+      "http://localhost:3000/beneficiaries/unarchived"
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching unarchived beneficiaries:", error);
+    throw error;
+  }
+};
