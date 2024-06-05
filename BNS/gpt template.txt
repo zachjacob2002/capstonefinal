@@ -1,0 +1,1 @@
+take note that i am using the latest implementation of react and material ui v6. put comments each code ecxplaining briefly what it does. make your code not shortcutted, and make it copy-paste ready, do not make me go cut codes from the original to your new code, just do everything for me. 

@@ -1,0 +1,140 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  user_id   Int    @id @default(autoincrement()) @map("user_id")
+  username  String @unique
+  password  String
+  firstName String @map("first_name")
+  lastName  String @map("last_name")
+  role      String
+  sex       String @default("Male")
+  barangay  String @default("Default Barangay")
+
+  activitiesCreated Activity[] @relation("CreatedBy")
+  reports           Report[]   @relation("Reports")
+  feedbacks         Feedback[] @relation("UserFeedback") 
+  notifications     Notification[]
+  events            Event[]    @relation("CreatedEvents") // Add this line
+
+  @@map("users")
+}
+
+
+model Beneficiary {
+  beneficiaryId Int     @id @default(autoincrement()) @map("beneficiary_id")
+  firstName     String  @map("first_name")
+  lastName      String  @map("last_name")
+  type          String
+  barangay      String
+  purok         String
+  sex           String
+  job           String?
+   birthdate     DateTime
+
+  activityParticipation ActivityParticipation[] @relation("BeneficiaryToParticipant")
+
+  @@map("beneficiaries")
+}
+
+model Activity {
+  activityId   Int      @id @default(autoincrement()) @map("activity_id")
+  title        String
+  description  String?
+  activityDate DateTime @map("activity_date")
+  createdBy    Int      @map("created_by")
+  createdAt    DateTime @default(now())
+
+  creator      User                    @relation("CreatedBy", fields: [createdBy], references: [user_id])
+  participants ActivityParticipation[] @relation("ActivityToParticipant")
+
+  @@map("activities")
+}
+
+model ActivityParticipation {
+  activityId    Int     @map("activity_id")
+  beneficiaryId Int     @map("beneficiary_id")
+  attended      Boolean @default(false)
+  filename      String? @map("filename")  
+  filepath      String? @map("filepath")  
+
+  activity    Activity    @relation("ActivityToParticipant", fields: [activityId], references: [activityId])
+  beneficiary Beneficiary @relation("BeneficiaryToParticipant", fields: [beneficiaryId], references: [beneficiaryId])
+
+  @@id([activityId, beneficiaryId])
+  @@map("activity_participation")
+}
+
+
+model Report {
+  reportId       Int        @id @default(autoincrement()) @map("report_id")
+  type           String     // 'MAR' or 'WAS'
+  month          String
+  year           Int
+  status         String     @default("Pending")
+  userId         Int        @map("user_id")
+  submissionDate DateTime   @default(now())
+  files          FileAttachment[] @relation("ReportFiles")
+  feedbacks      Feedback[] @relation("ReportFeedback") // Relation to feedbacks
+
+  user User @relation("Reports", fields: [userId], references: [user_id])
+
+  @@map("reports")
+}
+
+model FileAttachment {
+  fileId   Int    @id @default(autoincrement()) @map("file_id")
+  reportId Int    @map("report_id")
+  filePath String
+  fileType String
+
+  report Report @relation("ReportFiles", fields: [reportId], references: [reportId])
+
+  @@map("file_attachments")
+}
+
+model Feedback {
+  feedbackId     Int      @id @default(autoincrement())
+  reportId       Int      @map("report_id")
+  createdBy      Int      @map("user_id")
+  content        String
+  createdAt      DateTime @default(now())
+
+  report Report @relation("ReportFeedback", fields: [reportId], references: [reportId])
+  user   User   @relation("UserFeedback", fields: [createdBy], references: [user_id])
+
+  @@map("feedbacks")
+}
+
+model Notification {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  title       String
+  message     String
+  createdAt   DateTime @default(now())
+  read        Boolean  @default(false)
+  type        String
+
+  user        User     @relation(fields: [userId], references: [user_id])
+
+  @@map("notifications")
+}
+
+model Event {
+  eventId     Int      @id @default(autoincrement()) @map("event_id")
+  title       String
+  start       DateTime
+  end         DateTime
+  allDay      Boolean
+  createdBy   Int      @map("created_by")
+  createdAt   DateTime @default(now())
+  user        User     @relation("CreatedEvents", fields: [createdBy], references: [user_id])
+
+  @@map("events")
+}

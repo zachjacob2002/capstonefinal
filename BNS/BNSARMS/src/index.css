@@ -1,0 +1,63 @@
+/* index.css */
+
+@import url("https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&display=swap");
+
+html,
+body,
+#root,
+.app,
+.content {
+  height: 100%;
+  width: 100%;
+  font-family: "Source Sans 3", sans-serif;
+  background-color: "#f3f6cf";
+  flex: 1; /* Takes remaining space */
+  overflow-y: auto; /* Scroll inside content only */
+}
+
+/* body {
+  cursor: url(/assets/cursor.png), auto;
+} */
+
+.app {
+  display: flex;
+  position: relative;
+  background-color: "#f3f6cf";
+}
+
+.topbar {
+  position: fixed;
+  top: 10px;
+  left: 3;
+  right: 10px;
+  z-index: 1000; /* Ensure it's above other content */
+  background-color: #008000; /* Green, adjust as needed */
+}
+
+.content {
+  flex-grow: 1;
+  padding-top: 64px; /* Height of your topbar */
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  border-radius: 5px; /* Rounded corners for the scrollbar */
+}
+
+/* Track */
+::-webkit-scrollbar-track {
+  background: #e0e0e0;
+  border-radius: 5px; /* Rounded corners for the track */
+}
+
+/* Handle */
+::-webkit-scrollbar-thumb {
+  background: #2b630b;
+  border-radius: 5px; /* Rounded corners for the thumb */
+}
+
+/* Handle on hover */
+::-webkit-scrollbar-thumb:hover {
+  background: #2b630b;
+  border-radius: 5px; /* Rounded corners for the thumb on hover */
+}
