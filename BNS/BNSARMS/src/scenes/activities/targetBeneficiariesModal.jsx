@@ -20,8 +20,14 @@ import {
 import { DataGrid } from "@mui/x-data-grid";
 import dayjs from "dayjs";
 import { useSnackbar } from "../../context/SnackbarContext";
+import useActivityStore from "../../stores/useActivityStore"; // Import useActivityStore
 
-const TargetBeneficiariesModal = ({ open, handleClose }) => {
+const TargetBeneficiariesModal = ({
+  open,
+  handleClose,
+  activityId,
+  refreshParticipations,
+}) => {
   const [ageGroups] = useState([
     "Infant",
     "Toddler",
@@ -37,7 +43,9 @@ const TargetBeneficiariesModal = ({ open, handleClose }) => {
   const [searchText, setSearchText] = useState("");
   const [beneficiaries, setBeneficiaries] = useState([]);
   const [filteredBeneficiaries, setFilteredBeneficiaries] = useState([]);
+  const [selectedRows, setSelectedRows] = useState([]);
   const { showSnackbar } = useSnackbar();
+  const { updateActivity } = useActivityStore(); // Use useActivityStore
 
   useEffect(() => {
     if (open) {
@@ -140,6 +148,32 @@ const TargetBeneficiariesModal = ({ open, handleClose }) => {
     searchText,
     beneficiaries,
   ]);
+
+  const handleAddSelected = async () => {
+    try {
+      const selectedBeneficiaries = selectedRows.map((id) =>
+        beneficiaries.find((b) => b.beneficiaryId === id)
+      );
+
+      console.log("Selected Beneficiaries:", selectedBeneficiaries);
+
+      const response = await axios.post(
+        "http://localhost:3000/participation/add",
+        {
+          activityId,
+          beneficiaries: selectedBeneficiaries,
+        }
+      );
+
+      console.log("Response from server:", response.data);
+      showSnackbar("Beneficiaries successfully added", "success");
+      handleClose();
+      refreshParticipations(); // Immediately refresh participations
+    } catch (error) {
+      console.error("Error adding beneficiaries:", error);
+      showSnackbar("Failed to add beneficiaries", "error");
+    }
+  };
 
   const columns = [
     { field: "beneficiaryId", headerName: "ID", width: 90 },
@@ -280,6 +314,7 @@ const TargetBeneficiariesModal = ({ open, handleClose }) => {
                 getRowHeight={() => 130}
                 checkboxSelection
                 onRowSelectionModelChange={(newSelection) => {
+                  setSelectedRows(newSelection);
                   console.log("Selected Rows:", newSelection);
                 }}
                 getRowId={(row) => row.beneficiaryId}
@@ -294,10 +329,7 @@ const TargetBeneficiariesModal = ({ open, handleClose }) => {
           <Button
             variant="contained"
             color="secondary"
-            onClick={() => {
-              console.log("Add Selected clicked");
-              showSnackbar("Beneficiaries successfully added", "success");
-            }}
+            onClick={handleAddSelected}
           >
             Add Selected
           </Button>

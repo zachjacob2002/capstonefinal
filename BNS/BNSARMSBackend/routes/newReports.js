@@ -328,30 +328,44 @@ router.get("/duplicates", async (req, res) => {
 });
 
 // GET endpoint to fetch all submission IDs and user details for a specific report
+// GET endpoint to fetch all submission IDs and user details for a specific report
 router.get("/:reportId/submissions", async (req, res) => {
   const { reportId } = req.params;
 
   try {
-    const submissions = await prisma.submission.findMany({
-      where: { reportId: parseInt(reportId) },
+    // Fetch all users with role "2"
+    const role2Users = await prisma.user.findMany({
+      where: { role: "2" },
       select: {
-        submissionId: true,
-        user: {
-          select: {
-            user_id: true,
-            firstName: true,
-            lastName: true,
-          },
-        },
+        user_id: true,
+        firstName: true,
+        lastName: true,
       },
     });
 
-    const uniqueUsers = {};
-    submissions.forEach((submission) => {
-      uniqueUsers[submission.user.user_id] = submission.user;
+    // Fetch submissions for the report
+    const submissions = await prisma.submission.findMany({
+      where: { reportId: parseInt(reportId) },
+      select: {
+        userId: true,
+        status: true,
+      },
     });
 
-    res.status(200).json(Object.values(uniqueUsers));
+    // Map submissions to user IDs
+    const submissionMap = submissions.reduce((acc, submission) => {
+      acc[submission.userId] = submission.status;
+      return acc;
+    }, {});
+
+    // Add submission status to users
+    const usersWithStatus = role2Users.map((user) => ({
+      ...user,
+      status: submissionMap[user.user_id] || "No submission",
+      hasSubmission: !!submissionMap[user.user_id],
+    }));
+
+    res.status(200).json(usersWithStatus);
   } catch (error) {
     res.status(500).json({ error: "Failed to fetch submissions" });
   }

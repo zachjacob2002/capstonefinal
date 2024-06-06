@@ -6,11 +6,10 @@ import { Box, Typography, Stack, TextField, Button } from "@mui/material";
 import GroupAddIcon from "@mui/icons-material/GroupAdd";
 import { DataGrid } from "@mui/x-data-grid";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
-import HighlightOffIcon from "@mui/icons-material/HighlightOff";
+import DoNotDisturbOnIcon from "@mui/icons-material/DoNotDisturbOn";
 import useActivityStore from "../../stores/useActivityStore";
 import useAuthStore from "../../stores/authStore";
 import TargetBeneficiariesModal from "./targetBeneficiariesModal";
-import DoNotDisturbOnIcon from "@mui/icons-material/DoNotDisturbOn";
 import DocumentationModal from "./documentationModal"; // Import the new modal
 import {
   fetchActivityParticipations,
@@ -28,6 +27,7 @@ const ViewActivity = () => {
   const activity = useActivityStore((state) =>
     state.activities.find((a) => a.id === Number(activityId))
   );
+  const { updateActivity } = useActivityStore();
 
   const [open, setOpen] = useState(false);
   const [openDocumentationModal, setOpenDocumentationModal] = useState(false); // State for documentation modal
@@ -47,6 +47,7 @@ const ViewActivity = () => {
     if (activityId) {
       const data = await fetchActivityParticipations(activityId);
       setParticipations(data);
+      updateActivity({ ...activity, participations: data });
     }
   };
 
@@ -98,7 +99,7 @@ const ViewActivity = () => {
   const columns = [
     {
       field: "attended",
-      headerName: "Attended Status",
+      headerName: "Attended?",
       width: 90,
       renderCell: (params) =>
         params.value ? (
@@ -112,15 +113,9 @@ const ViewActivity = () => {
     { field: "beneficiaryMiddleName", headerName: "Middle Name", width: 150 },
     { field: "beneficiaryLastName", headerName: "Last Name", width: 150 },
     { field: "beneficiarySuffix", headerName: "Suffix", width: 90 },
-    {
-      field: "beneficiaryTypes",
-      headerName: "Types",
-      width: 200,
-      renderCell: (params) => (
-        <div style={{ whiteSpace: "pre-wrap" }}>{params.value}</div>
-      ),
-    },
-    { field: "beneficiarySex", headerName: "Sex", width: 120 },
+    { field: "beneficiaryTypes", headerName: "Types", width: 200 },
+    { field: "beneficiarySubType", headerName: "Subtype", width: 200 },
+    { field: "beneficiaryAgeGroup", headerName: "Age Group", width: 150 },
     { field: "beneficiaryJob", headerName: "Job", width: 150 },
     { field: "beneficiaryBarangay", headerName: "Barangay", width: 150 },
     {
@@ -193,6 +188,7 @@ const ViewActivity = () => {
     const pageWidth = doc.internal.pageSize.getWidth();
     const title = activity.title; // Use the title from the activity state
     const location = "Polomolok, South Cotabato";
+    const activityDate = dayjs(activity.activityDate).format("MMMM YYYY");
 
     const filteredColumns = columns
       .filter(
@@ -204,12 +200,17 @@ const ViewActivity = () => {
             "beneficiaryAge",
             "beneficiaryCivilStatus",
             "beneficiaryContactNumber",
+            "beneficiaryJob",
+            "beneficiaryHealthStation",
             "beneficiaryTypes",
+            "beneficiarySubType",
+            "beneficiaryAgeGroup",
+            "beneficiarySex", // Exclude the Sex field
           ].includes(col.field)
       )
       .map((col) => {
-        if (col.field === "beneficiaryHealthStation") {
-          return { ...col, headerName: "BHS" }; // Rename column header
+        if (col.field === "beneficiaryBarangay") {
+          return { ...col, headerName: "Barangay" }; // Rename column header
         }
         return col;
       });
@@ -241,16 +242,18 @@ const ViewActivity = () => {
     const titleX = pageWidth / 2;
     const titleY = 110; // Adjust based on your layout
     const locationY = titleY + 20; // Position below the title
+    const dateY = locationY + 20; // Position below the location
 
     doc.setFontSize(15);
     doc.text(title, titleX, titleY, { align: "center" });
     doc.setFontSize(12);
     doc.text(location, titleX, locationY, { align: "center" });
+    doc.text(activityDate, titleX, dateY, { align: "center" });
 
     doc.autoTable({
       head: headers,
       body: data,
-      startY: 150,
+      startY: dateY + 10, // Add space between the date and the table
       theme: "striped",
       headStyles: {
         fillColor: [22, 160, 133], // example RGB values
@@ -373,15 +376,6 @@ const ViewActivity = () => {
           rowSelectionModel={selectedRows}
           getRowId={(row) => row.beneficiaryId}
           isRowSelectable={(params) => !params.row.attended}
-          columnVisibilityModel={{
-            beneficiaryId: false,
-            beneficiaryBirthdate: false,
-            beneficiaryAge: false,
-            beneficiaryJob: false,
-            beneficiaryCivilStatus: false,
-            beneficiaryContactNumber: false,
-            beneficiaryTypes: false,
-          }}
         />
       </div>
       {selectedRows.length > 0 && (

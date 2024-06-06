@@ -47,13 +47,10 @@ const ReportPaper = ({ title, status, color }) => {
         minWidth: "30%",
         height: "150px",
         boxShadow: "2px 0 10px rgba(0,0,0,0.1), -3px 0 10px rgba(0,0,0,0.1)",
-        "&:hover": {
-          boxShadow: "5px 0 15px rgba(0,0,0,0.2), -5px 0 15px rgba(0,0,0,0.2)",
-        },
+
         display: "flex",
         flexDirection: "column",
         justifyContent: "space-between",
-        cursor: "pointer",
         backgroundColor: color, // Apply the background color
       }}
     >
@@ -122,9 +119,6 @@ const RecentReportsPaper = ({ reports }) => {
       <List>
         <ListItem>
           <Grid container>
-            <Grid item xs={2}>
-              <Typography variant="subtitle2">Name</Typography>
-            </Grid>
             <Grid item xs={3}>
               <Typography variant="subtitle2">Type</Typography>
             </Grid>
@@ -143,9 +137,6 @@ const RecentReportsPaper = ({ reports }) => {
         {reports.map((report) => (
           <ListItem key={report.id}>
             <Grid container>
-              <Grid item xs={2}>
-                <Typography>{report.name}</Typography>
-              </Grid>
               <Grid item xs={3}>
                 <Typography>{report.type}</Typography>
               </Grid>

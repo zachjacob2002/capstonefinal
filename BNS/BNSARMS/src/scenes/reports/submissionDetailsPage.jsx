@@ -51,6 +51,17 @@ const ReportSubmissionPage = () => {
   const [snackbarSeverity, setSnackbarSeverity] = useState("success");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [pendingStatus, setPendingStatus] = useState(null);
+  const [alertSnackbarOpen, setAlertSnackbarOpen] = useState(false);
+
+  const handleAlertSnackbarClose = () => {
+    setAlertSnackbarOpen(false);
+  };
+
+  const showAlertSnackbar = (message) => {
+    setSnackbarMessage(message);
+    setSnackbarSeverity("warning");
+    setAlertSnackbarOpen(true);
+  };
 
   useEffect(() => {
     const fetchReportDetails = async () => {
@@ -108,7 +119,7 @@ const ReportSubmissionPage = () => {
 
   const handleSubmit = async () => {
     if (files.every((file) => file === null)) {
-      alert("Please attach a file first");
+      showAlertSnackbar("Please attach a file first");
       return;
     }
 
@@ -243,8 +254,12 @@ const ReportSubmissionPage = () => {
     const date = dayjs(dateString);
     const dueDate = dayjs(reportDetails?.dueDate);
     const isLate = date.isAfter(dueDate);
-    const lateText = isLate ? " (Late)" : "";
-    return `Submitted last Month - ${date.format("MM-DD hh:mm A")}${lateText}`;
+    return (
+      <span>
+        Submitted last Month - {date.format("MM-DD hh:mm A")}
+        {isLate && <span style={{ color: "red" }}> (Late)</span>}
+      </span>
+    );
   };
 
   const calculateTimeLeft = () => {
@@ -326,17 +341,6 @@ const ReportSubmissionPage = () => {
         ) : (
           <Box
             sx={{
-              padding: 1,
-              borderRadius: "5px",
-              border: `1px solid ${
-                status === "Submitted"
-                  ? "orange"
-                  : status === "Needs Revision"
-                  ? "red"
-                  : status === "Completed"
-                  ? "green"
-                  : "grey"
-              }`,
               color: `${
                 status === "Submitted"
                   ? "orange"
@@ -423,15 +427,24 @@ const ReportSubmissionPage = () => {
                 display: "inline-block",
                 padding: 1,
                 borderRadius: "5px",
-                border: "1px solid green",
                 mr: 1,
                 mb: 1,
                 cursor: "pointer",
+                boxShadow: "none", // Remove border
+                "&:hover .file-name": {
+                  color: "green",
+                },
               }}
               onClick={handleFileClick(file)}
             >
-              <Typography>{file.fileName}</Typography>
-              <Typography variant="caption" color="textSecondary">
+              <Typography className="file-name" sx={{ display: "block" }}>
+                {file.fileName}
+              </Typography>
+              <Typography
+                variant="caption"
+                color="textSecondary"
+                sx={{ display: "block" }}
+              >
                 {formatSubmissionDate(file.createdAt)}
               </Typography>
             </Paper>
@@ -449,19 +462,27 @@ const ReportSubmissionPage = () => {
               <Paper
                 key={index}
                 sx={{
-                  color: "grey",
                   display: "inline-block",
                   padding: 1,
                   borderRadius: "5px",
-                  border: "1px solid green",
                   mr: 1,
                   mb: 1,
                   cursor: "pointer",
+                  boxShadow: "none", // Remove border
+                  "&:hover .file-name": {
+                    color: "green",
+                  },
                 }}
                 onClick={handleFileClick(file)}
               >
-                <Typography>{file.fileName}</Typography>
-                <Typography variant="caption" color="textSecondary">
+                <Typography className="file-name" sx={{ display: "block" }}>
+                  {file.fileName}
+                </Typography>
+                <Typography
+                  variant="caption"
+                  color="textSecondary"
+                  sx={{ display: "block" }}
+                >
                   {formatSubmissionDate(file.createdAt)}
                 </Typography>
               </Paper>
@@ -473,7 +494,7 @@ const ReportSubmissionPage = () => {
       <Divider sx={{ my: 2, width: "100%" }} />
 
       <Typography variant="h6" sx={{ mt: 2, fontWeight: "bold" }}>
-        Feedback History:
+        Remarks History:
       </Typography>
       <List sx={{ overflow: "auto" }}>
         {feedbackHistory.map((feedbackItem) => (
@@ -511,7 +532,7 @@ const ReportSubmissionPage = () => {
         ))}
       </List>
       <TextField
-        label="Feedback"
+        label="Remarks"
         multiline
         rows={4}
         fullWidth
@@ -524,7 +545,7 @@ const ReportSubmissionPage = () => {
         sx={{ color: "white", mt: 2, ml: 1, backgroundColor: "green" }}
         onClick={handleFeedbackSubmit}
       >
-        Send Feedback
+        Send Remarks
       </Button>
 
       <Box display="flex" justifyContent="flex-end" mt={2}>
@@ -541,6 +562,7 @@ const ReportSubmissionPage = () => {
               variant="contained"
               sx={{ color: "white", ml: 1, backgroundColor: "green" }}
               onClick={handleSubmit}
+              disabled={status === "Completed"}
             >
               Submit Report
             </Button>
@@ -562,7 +584,7 @@ const ReportSubmissionPage = () => {
             transform: "translate(-50%, -50%)",
             bgcolor: "background.paper",
             border: "2px solid #000",
-            boxShadow: 24,
+            boxShadow: "none",
             p: 4,
             width: "80%",
             height: "80%",
@@ -615,6 +637,20 @@ const ReportSubmissionPage = () => {
           </Button>
         </DialogActions>
       </Dialog>
+      <Snackbar
+        open={alertSnackbarOpen}
+        autoHideDuration={6000}
+        onClose={handleAlertSnackbarClose}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+      >
+        <Alert
+          onClose={handleAlertSnackbarClose}
+          severity={snackbarSeverity}
+          sx={{ width: "100%" }}
+        >
+          {snackbarMessage}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

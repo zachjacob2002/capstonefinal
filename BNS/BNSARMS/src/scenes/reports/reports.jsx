@@ -96,15 +96,40 @@ const Reports = () => {
         return acc;
       }, {});
 
-      setReports(
-        Object.values(uniqueReports)
-          .map((report) => ({
+      const reportsWithStatus = await Promise.all(
+        Object.values(uniqueReports).map(async (report) => {
+          const submissionResponse = await axios.get(
+            `http://localhost:3000/newReports/report/${report.reportId}`,
+            {
+              params: { userId: user.user_id },
+            }
+          );
+
+          // If user role is "1", fetch the total number of users with at least one submission
+          let totalSubmissions = 0;
+          if (user.role === "1") {
+            const submissionCountResponse = await axios.get(
+              `http://localhost:3000/newReports/${report.reportId}/submissions`
+            );
+            const usersWithSubmissions = submissionCountResponse.data.filter(
+              (submission) => submission.status !== "No submission"
+            );
+            totalSubmissions = usersWithSubmissions.length;
+          }
+
+          return {
             ...report,
             id: report.reportId,
-          }))
-          .sort(
-            (a, b) => new Date(b.submissionDate) - new Date(a.submissionDate)
-          )
+            userStatus: submissionResponse.data.userStatus,
+            totalSubmissions: totalSubmissions, // Add totalSubmissions to report object
+          };
+        })
+      );
+
+      setReports(
+        reportsWithStatus.sort(
+          (a, b) => new Date(b.submissionDate) - new Date(a.submissionDate)
+        )
       );
     } catch (error) {
       console.error("Error fetching reports:", error);
@@ -131,7 +156,6 @@ const Reports = () => {
 
   const checkForDuplicateReport = async (type, month, year) => {
     try {
-      // Ensure type and month are strings and year is an integer
       if (
         typeof type !== "string" ||
         typeof month !== "string" ||
@@ -147,7 +171,7 @@ const Reports = () => {
       console.log(
         "Checking for duplicate report with parameters:",
         JSON.stringify(params, null, 2)
-      ); // Log the parameters in structured format
+      );
 
       const response = await axios.get(
         "http://localhost:3000/newReports/duplicates",
@@ -159,7 +183,7 @@ const Reports = () => {
       console.log(
         "Duplicate check response:",
         JSON.stringify(response.data, null, 2)
-      ); // Log the response in structured format
+      );
 
       if (response.data.length > 0) {
         setWarningMessage("This Report already exists");
@@ -170,13 +194,19 @@ const Reports = () => {
       }
     } catch (error) {
       console.error("Error checking for duplicate report:", error);
-
-      // Log detailed error information
       console.error(
         "Error details:",
         error.response ? error.response.data : error.message
       );
     }
+  };
+
+  const calculateDaysRemaining = (dueDate) => {
+    const now = new Date();
+    const due = new Date(dueDate);
+    const timeDifference = due.getTime() - now.getTime();
+    const daysRemaining = Math.ceil(timeDifference / (1000 * 3600 * 24));
+    return daysRemaining < 0 ? "Past Due Date" : `${daysRemaining} days left`;
   };
 
   const handleNewReportChange = (e) => {
@@ -188,7 +218,6 @@ const Reports = () => {
         [name]: value,
       };
 
-      // Log the updated report
       console.log(
         "Updated report parameters:",
         JSON.stringify(updatedReport, null, 2)
@@ -290,7 +319,7 @@ const Reports = () => {
   const formatDate = (date) => {
     const options = {
       month: "long",
-      day: "numeric", // Include day in the formatted date
+      day: "numeric",
       year: "numeric",
       hour: "2-digit",
       minute: "2-digit",
@@ -346,6 +375,22 @@ const Reports = () => {
         />,
       ],
     });
+  } else {
+    columns.push({
+      field: "userStatus",
+      headerName: "Status",
+      width: 200,
+      renderCell: (params) => <Box>{params.value}</Box>,
+    });
+  }
+
+  if (user.role === "1") {
+    columns.push({
+      field: "totalSubmissions",
+      headerName: "Total Number of Submissions",
+      width: 200,
+      renderCell: (params) => <Box>{params.value}</Box>,
+    });
   }
 
   const handleRowClick = (params) => {
@@ -355,6 +400,16 @@ const Reports = () => {
       navigate(`/app/bns-submission-page/${params.id}`);
     }
   };
+
+  if (user.role !== "1") {
+    columns.push({
+      field: "daysRemaining",
+      headerName: "Days Remaining",
+      width: 150,
+      valueGetter: (params) => calculateDaysRemaining(params.row.dueDate),
+      renderCell: (params) => <Box>{params.value}</Box>,
+    });
+  }
 
   return (
     <Box m={2}>
