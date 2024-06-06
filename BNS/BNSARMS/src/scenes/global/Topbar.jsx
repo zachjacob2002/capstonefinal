@@ -41,10 +41,18 @@ const Topbar = () => {
   const notificationOpen = Boolean(notificationAnchorEl);
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState([]);
+  const [newReports, setNewReports] = useState([]);
   const { user, logout } = useAuthStore();
   const apiBaseUrl = "http://localhost:3000"; // Adjust this URL to your backend server's URL
 
   const goBack = () => navigate(-1);
+
+  useEffect(() => {
+    const fetchNewReports = async () => {
+    };
+
+    fetchNewReports();
+  }, []);
 
   useEffect(() => {
     if (user && user.user_id) {
@@ -54,6 +62,7 @@ const Topbar = () => {
             params: { userId: user.user_id },
           });
           setNotifications(response.data);
+
         } catch (error) {
           console.error("Failed to fetch notifications:", error);
         }
@@ -86,10 +95,32 @@ const Topbar = () => {
     } catch (error) {
       console.error("Failed to mark notifications as read:", error);
     }
+    //FOR DUE DAT HANDLING
+
+    try {
+      console.log("fethcing");
+      const response = await axios.get(`${apiBaseUrl}/newReports`, {
+        params: { isArchived: false },
+      });
+      const today = new Date();
+      response.data.forEach(e => {
+        const dueDate = new Date(e.dueDate);
+        console.log();
+        e.dueStatus = dueDate.getTime() < today.getTime() ? 2 : dueDate.getDate() === today.getDate() && dueDate.getTime() > today.getTime() ? 1 : 0
+      });
+      setNewReports(response.data);
+      console.log(newReports);
+    } catch (error) {
+      console.error('Error fetching new reports:', error);
+    }
   };
 
   const handleNotificationClose = () => {
     setNotificationAnchorEl(null);
+  };
+
+  const handleDueDateClick = (id)=>{
+    window.location.replace(`/app/bns-submission-page/${id}`);
   };
 
   const handleLogoutClick = () => {
@@ -167,6 +198,20 @@ const Topbar = () => {
         </CardContent>
         <Divider />
         <List dense>
+        {newReports.filter(report => report.dueStatus !== 0).map((report, index) => (
+            <ListItem key={index} button onClick={() => handleDueDateClick(report.reportId)} style={{ backgroundColor: report.dueStatus === 1 ? 'yellow' : '#dd9595' }}>
+              <ListItemIcon>
+                <MailOutlineIcon color="primary" />
+              </ListItemIcon>
+              <ListItemText
+                primary={report.dueStatus == 1 ? `You have a ${report.type} due today! Please comply.` : `Your ${report.type} is already due!`}
+                secondary={`Due ${new Date(
+                  report.dueDate
+                ).toLocaleString()}`}
+              />
+            </ListItem>
+          ))}
+          
           {notifications.map((notification, index) => (
             <ListItem key={index} button onClick={onClose}>
               <ListItemIcon>
