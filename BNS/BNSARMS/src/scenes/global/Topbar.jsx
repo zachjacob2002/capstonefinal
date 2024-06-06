@@ -95,24 +95,49 @@ const Topbar = () => {
     } catch (error) {
       console.error("Failed to mark notifications as read:", error);
     }
-    //FOR DUE DAT HANDLING
+    //FOR DUE DATE HANDLING
 
     try {
-      console.log("fethcing");
+      console.log("fetching");
       const response = await axios.get(`${apiBaseUrl}/newReports`, {
-        params: { isArchived: false },
+          params: { isArchived: false },
       });
       const today = new Date();
-      response.data.forEach(e => {
-        const dueDate = new Date(e.dueDate);
-        console.log();
-        e.dueStatus = dueDate.getTime() < today.getTime() ? 2 : dueDate.getDate() === today.getDate() && dueDate.getTime() > today.getTime() ? 1 : 0
+  
+      // An array to store promises for each asynchronous operation
+      const promises = response.data.map(async (e) => {
+          // CHECK IF SUBMITTED
+          var userString = localStorage.getItem('user');
+          var jsonUser = JSON.parse(userString);
+  
+          const dueDate = new Date(e.dueDate);
+  
+          const submitted = await axios.get(`${apiBaseUrl}/dashboard/user-report-status`, {
+              params: { 
+                  userId: jsonUser.user_id, 
+                  type: e.type, 
+                  year: dueDate.getFullYear(), 
+                  month: e.month 
+              },
+          });
+  
+          e.dueStatus = dueDate.getTime() < today.getTime() ? 2 : 
+                        dueDate.getDate() === today.getDate() && dueDate.getTime() > today.getTime() ? 1 : 
+                        0;
+          if (submitted.data.status == 'Submitted') e.dueStatus = 3;
+  
+          return e; // Return the modified object
       });
-      setNewReports(response.data);
+  
+      // Wait for all promises to resolve
+      const updatedReports = await Promise.all(promises);
+  
+      setNewReports(updatedReports);
       console.log(newReports);
-    } catch (error) {
+  } catch (error) {
       console.error('Error fetching new reports:', error);
-    }
+  }
+  
   };
 
   const handleNotificationClose = () => {
@@ -198,9 +223,10 @@ const Topbar = () => {
         </CardContent>
         <Divider />
         <List dense>
-        {newReports.filter(report => report.dueStatus !== 0).map((report, index) => (
+        {newReports.filter(report => report.dueStatus !== 0 && report.dueStatus !== 3).map((report, index) => (
             <ListItem key={index} button onClick={() => handleDueDateClick(report.reportId)} style={{ backgroundColor: report.dueStatus === 1 ? 'yellow' : '#dd9595' }}>
               <ListItemIcon>
+                {report.dueStatus}
                 <MailOutlineIcon color="primary" />
               </ListItemIcon>
               <ListItemText
