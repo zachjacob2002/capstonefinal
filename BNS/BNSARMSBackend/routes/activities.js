@@ -100,9 +100,17 @@ router.get("/", async (req, res) => {
       },
       include: {
         creator: true,
+        participants: true, // Include participants to count them
       },
     });
-    res.json(activities);
+
+    // Add the count of beneficiaries to each activity
+    const activitiesWithBeneficiaryCount = activities.map((activity) => ({
+      ...activity,
+      numberOfBeneficiaries: activity.participants.length,
+    }));
+
+    res.json(activitiesWithBeneficiaryCount);
   } catch (error) {
     console.error("Error fetching activities:", error);
     res.status(500).send("Failed to fetch activities");

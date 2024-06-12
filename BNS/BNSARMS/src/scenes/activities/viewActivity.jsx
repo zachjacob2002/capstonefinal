@@ -35,6 +35,7 @@ const ViewActivity = () => {
   const [filteredParticipations, setFilteredParticipations] = useState([]);
   const [searchText, setSearchText] = useState("");
   const [selectedRows, setSelectedRows] = useState([]);
+  const [allTypes, setAllTypes] = useState([]);
 
   const { showSnackbar } = useSnackbar(); // Use useSnackbar
 
@@ -72,6 +73,19 @@ const ViewActivity = () => {
     setFilteredParticipations(sortedParticipations);
   }, [participations]);
 
+  useEffect(() => {
+    const fetchAllTypes = async () => {
+      try {
+        const response = await axios.get("http://localhost:3000/types");
+        setAllTypes(response.data);
+      } catch (error) {
+        console.error("Failed to fetch all types:", error);
+      }
+    };
+
+    fetchAllTypes();
+  }, []);
+
   const formatBirthdate = (date) => {
     return dayjs(date).format("MMMM - DD - YYYY");
   };
@@ -96,6 +110,19 @@ const ViewActivity = () => {
 
   const displayDate = dayjs(activity.activityDate).format("MMMM - YYYY");
 
+  const typeColumns = allTypes.map((type) => ({
+    field: type.typeName,
+    headerName: `${type.typeName}?`,
+    width: 150,
+    renderCell: (params) => {
+      const value = params.row.beneficiaryTypes.includes(type.typeName)
+        ? type.typeName
+        : "No";
+      console.log(`Value for ${type.typeName}:`, value); // Log the value for each type column
+      return <div style={{ whiteSpace: "pre-wrap" }}>{value}</div>;
+    },
+  }));
+
   const columns = [
     {
       field: "attended",
@@ -113,8 +140,6 @@ const ViewActivity = () => {
     { field: "beneficiaryMiddleName", headerName: "Middle Name", width: 150 },
     { field: "beneficiaryLastName", headerName: "Last Name", width: 150 },
     { field: "beneficiarySuffix", headerName: "Suffix", width: 90 },
-    { field: "beneficiaryTypes", headerName: "Types", width: 200 },
-    { field: "beneficiarySubType", headerName: "Subtype", width: 200 },
     { field: "beneficiaryAgeGroup", headerName: "Age Group", width: 150 },
     { field: "beneficiaryJob", headerName: "Job", width: 150 },
     { field: "beneficiaryBarangay", headerName: "Barangay", width: 150 },
@@ -123,6 +148,8 @@ const ViewActivity = () => {
       headerName: "Health Station",
       width: 150,
     },
+    ...typeColumns,
+    { field: "beneficiarySubType", headerName: "Subtype", width: 200 },
   ];
 
   const handleSelectionModelChange = (newSelectionModel) => {

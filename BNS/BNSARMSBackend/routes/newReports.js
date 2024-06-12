@@ -203,11 +203,22 @@ router.post("/submit", upload.array("files", 3), async (req, res) => {
 
 // POST endpoint to add feedback to a report
 // POST endpoint to add feedback to a report
+// Existing code for feedback submission
 router.post("/:reportId/feedback", async (req, res) => {
   const { reportId } = req.params;
   const { userId, content, submissionId } = req.body;
 
   try {
+    // Fetch the user details
+    const user = await prisma.user.findUnique({
+      where: { user_id: parseInt(userId) },
+    });
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    // Create new feedback
     const newFeedback = await prisma.feedback.create({
       data: {
         reportId: parseInt(reportId),
@@ -217,37 +228,39 @@ router.post("/:reportId/feedback", async (req, res) => {
       },
     });
 
-    // Fetch submission and user details for notification
-    const submission = await prisma.submission.findUnique({
-      where: { submissionId: parseInt(submissionId) },
-      include: { user: true },
+    // Include user details in the response
+    res.status(201).json({
+      ...newFeedback,
+      user: {
+        firstName: user.firstName,
+        lastName: user.lastName,
+      },
     });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to add feedback" });
+  }
+});
 
-    if (!submission) {
-      throw new Error("Submission not found");
-    }
+// API endpoint to fetch user details
+router.get("/user/:userId", async (req, res) => {
+  const { userId } = req.params;
 
-    // Determine the user to notify
-    const userToNotifyId =
-      submission.userId === parseInt(userId) ? 1 : submission.userId;
-    const notificationMessage =
-      submission.userId === parseInt(userId)
-        ? `NPC provided feedback on your submission for report ${reportId}.`
-        : `${submission.user.firstName} ${submission.user.lastName} provided feedback on your submission for report ${reportId}.`;
-
-    await prisma.notification.create({
-      data: {
-        userId: userToNotifyId,
-        title: "New Feedback Received",
-        message: notificationMessage,
-        type: "info",
-        read: false,
+  try {
+    const user = await prisma.user.findUnique({
+      where: { user_id: parseInt(userId) },
+      select: {
+        firstName: true,
+        lastName: true,
       },
     });
 
-    res.status(201).json(newFeedback);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    res.status(200).json(user);
   } catch (error) {
-    res.status(500).json({ error: "Failed to add feedback" });
+    res.status(500).json({ error: "Failed to fetch user details" });
   }
 });
 
@@ -349,19 +362,24 @@ router.get("/:reportId/submissions", async (req, res) => {
       select: {
         userId: true,
         status: true,
+        submissionDate: true,
       },
     });
 
     // Map submissions to user IDs
     const submissionMap = submissions.reduce((acc, submission) => {
-      acc[submission.userId] = submission.status;
+      acc[submission.userId] = {
+        status: submission.status,
+        submissionDate: submission.submissionDate,
+      };
       return acc;
     }, {});
 
-    // Add submission status to users
+    // Add submission status and submission date to users
     const usersWithStatus = role2Users.map((user) => ({
       ...user,
-      status: submissionMap[user.user_id] || "No submission",
+      status: submissionMap[user.user_id]?.status || "No submission",
+      submissionDate: submissionMap[user.user_id]?.submissionDate || null,
       hasSubmission: !!submissionMap[user.user_id],
     }));
 

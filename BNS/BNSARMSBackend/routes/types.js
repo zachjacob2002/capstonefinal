@@ -114,4 +114,24 @@ router.get("/typesforparticipation", async (req, res) => {
   }
 });
 
+// Inside the router code
+
+// POST endpoint for checking duplicate subtypes
+router.post("/check-duplicate-subtype", async (req, res) => {
+  const { subtype } = req.body;
+  try {
+    const existingSubtype = await prisma.type.findFirst({
+      where: {
+        subTypes: {
+          has: subtype,
+        },
+      },
+    });
+    res.json({ isDuplicate: !!existingSubtype });
+  } catch (error) {
+    console.error("Error checking duplicate subtype:", error);
+    res.status(500).send("Internal Server Error");
+  }
+});
+
 module.exports = router;

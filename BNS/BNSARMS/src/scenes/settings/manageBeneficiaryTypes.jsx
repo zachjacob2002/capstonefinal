@@ -37,6 +37,7 @@ const ManageBeneficiaryTypesPage = () => {
   const { showSnackbar } = useSnackbar();
   const { state } = useLocation();
   const isEditMode = state && state.type;
+  const [subTypeErrors, setSubTypeErrors] = useState([]);
 
   useEffect(() => {
     if (isEditMode) {
@@ -130,6 +131,40 @@ const ManageBeneficiaryTypesPage = () => {
 
     return true;
   };
+
+  // Inside ManageBeneficiaryTypesPage component
+
+  useEffect(() => {
+    const checkDuplicateSubtype = async (subtype) => {
+      if (subtype) {
+        try {
+          const response = await axios.post(
+            "http://localhost:3000/types/check-duplicate-subtype",
+            { subtype }
+          );
+          return response.data.isDuplicate;
+        } catch (error) {
+          console.error("Error checking duplicate subtype:", error);
+          return false;
+        }
+      }
+      return false;
+    };
+
+    const validateSubtypes = async () => {
+      const errors = await Promise.all(
+        subTypes.map(async (subtype) => {
+          const isDuplicate = await checkDuplicateSubtype(subtype);
+          return isDuplicate ? `Subtype "${subtype}" already exists` : "";
+        })
+      );
+      setSubTypeErrors(errors);
+    };
+
+    if (subTypes.some((subtype) => subtype)) {
+      validateSubtypes();
+    }
+  }, [subTypes]);
 
   const handleSave = async () => {
     const isValid = await validateForm();
@@ -305,7 +340,7 @@ const ManageBeneficiaryTypesPage = () => {
         </Typography>
         <Box mt={1} ml={2}>
           {subTypes.map((subType, index) => (
-            <Box key={index} display="flex" alignItems="center" mt={1}>
+            <Box key={index} display="flex" flexDirection="column" mt={1}>
               <TextField
                 fullWidth
                 variant="outlined"
@@ -314,6 +349,9 @@ const ManageBeneficiaryTypesPage = () => {
                 onChange={(e) => handleSubtypeChange(index, e.target.value)}
                 sx={{ width: "20%" }}
               />
+              {subTypeErrors[index] && (
+                <Typography color="error">{subTypeErrors[index]}</Typography>
+              )}
             </Box>
           ))}
           {subTypes.length === 0 ||

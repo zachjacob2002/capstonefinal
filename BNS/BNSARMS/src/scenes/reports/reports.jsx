@@ -358,6 +358,13 @@ const Reports = () => {
       valueFormatter: (params) => formatDate(params.value),
       renderCell: (params) => <Box>{formatDate(params.value)}</Box>,
     },
+    {
+      field: "daysRemaining",
+      headerName: "Days Remaining",
+      width: 150,
+      valueGetter: (params) => calculateDaysRemaining(params.row.dueDate),
+      renderCell: (params) => <Box>{params.value}</Box>,
+    },
   ];
 
   if (user.role === "1") {
@@ -380,7 +387,23 @@ const Reports = () => {
       field: "userStatus",
       headerName: "Status",
       width: 200,
-      renderCell: (params) => <Box>{params.value}</Box>,
+      renderCell: (params) => {
+        let color;
+        switch (params.value) {
+          case "Submitted":
+            color = "orange";
+            break;
+          case "Needs Revision":
+            color = "red";
+            break;
+          case "Completed":
+            color = "green";
+            break;
+          default:
+            color = "black";
+        }
+        return <Box sx={{ color }}>{params.value}</Box>;
+      },
     });
   }
 
@@ -400,16 +423,6 @@ const Reports = () => {
       navigate(`/app/bns-submission-page/${params.id}`);
     }
   };
-
-  if (user.role !== "1") {
-    columns.push({
-      field: "daysRemaining",
-      headerName: "Days Remaining",
-      width: 150,
-      valueGetter: (params) => calculateDaysRemaining(params.row.dueDate),
-      renderCell: (params) => <Box>{params.value}</Box>,
-    });
-  }
 
   return (
     <Box m={2}>

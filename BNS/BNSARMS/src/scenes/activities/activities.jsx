@@ -188,6 +188,13 @@ const Activities = () => {
   };
 
   const columns = [
+    {
+      field: "activityDate",
+      headerName: "Date",
+      width: 150,
+      valueFormatter: (params) => formatDate(params.value),
+      renderCell: (params) => <Box>{formatDate(params.value)}</Box>,
+    },
     { field: "activityId", headerName: "ID", width: 90 },
     {
       field: "title",
@@ -200,19 +207,29 @@ const Activities = () => {
       headerName: "Description",
       width: 300,
     },
-    {
-      field: "activityDate",
-      headerName: "Date",
-      width: 150,
-      valueFormatter: (params) => formatDate(params.value),
-      renderCell: (params) => <Box>{formatDate(params.value)}</Box>,
-    },
+
     {
       field: "numberOfBeneficiaries",
       headerName: "No. of Beneficiaries Involved",
       width: 300,
     },
   ];
+
+  if (user.role === "1") {
+    columns.push({
+      field: "createdBy",
+      headerName: "Created By",
+      width: 200,
+      renderCell: (params) => {
+        const creator = allUsers.find((u) => u.id === params.value);
+        return (
+          <Box>
+            {creator ? `${creator.firstName} ${creator.lastName}` : "Unknown"}
+          </Box>
+        );
+      },
+    });
+  }
 
   if (user.role !== "1") {
     columns.unshift({
@@ -365,7 +382,6 @@ const Activities = () => {
           autoHeight
           columnVisibilityModel={{
             activityId: false,
-            numberOfBeneficiaries: false,
           }}
           getRowHeight={() => 70}
           getRowId={(row) => row.id} // Ensure each row has a unique id

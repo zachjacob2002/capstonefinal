@@ -8,14 +8,10 @@ import {
   Modal,
   Button,
   Stack,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  TextField,
   FormControlLabel,
-  Radio,
-  RadioGroup,
+  Checkbox,
+  FormGroup,
+  TextField,
 } from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
 import dayjs from "dayjs";
@@ -36,9 +32,12 @@ const TargetBeneficiariesModal = ({
     "Adult",
     "Senior Citizen",
   ]);
+  const [sexOptions] = useState(["Male", "Female"]);
   const [types, setTypes] = useState([]);
-  const [selectedAgeGroup, setSelectedAgeGroup] = useState("");
-  const [selectedType, setSelectedType] = useState("");
+  const [allTypes, setAllTypes] = useState([]);
+  const [selectedAgeGroups, setSelectedAgeGroups] = useState([]);
+  const [selectedSexes, setSelectedSexes] = useState([]);
+  const [selectedTypes, setSelectedTypes] = useState([]);
   const [selectedSubType, setSelectedSubType] = useState("");
   const [searchText, setSearchText] = useState("");
   const [beneficiaries, setBeneficiaries] = useState([]);
@@ -48,20 +47,24 @@ const TargetBeneficiariesModal = ({
   const { updateActivity } = useActivityStore(); // Use useActivityStore
 
   useEffect(() => {
-    if (open) {
-      fetchBeneficiaries();
-    }
-  }, [open]);
+    const fetchAllTypes = async () => {
+      try {
+        const response = await axios.get("http://localhost:3000/types");
+        setAllTypes(response.data);
+        setTypes(response.data); // Set the types immediately for display
+      } catch (error) {
+        console.error("Failed to fetch all types:", error);
+      }
+    };
+
+    fetchAllTypes();
+  }, []);
 
   useEffect(() => {
-    if (selectedAgeGroup) {
-      fetchTypes(selectedAgeGroup);
-    } else {
-      setTypes([]);
-      setSelectedType("");
-      setSelectedSubType("");
+    if (open && allTypes.length) {
+      fetchBeneficiaries();
     }
-  }, [selectedAgeGroup]);
+  }, [open, allTypes]);
 
   const fetchBeneficiaries = async () => {
     try {
@@ -71,36 +74,20 @@ const TargetBeneficiariesModal = ({
       const formattedBeneficiaries = response.data.map((beneficiary) => ({
         ...beneficiary,
         birthdate: dayjs(beneficiary.birthdate).format("MMMM-DD-YYYY"),
-        types: beneficiary.beneficiaryTypes
-          .map((bt) => bt.type.typeName)
-          .join(", "),
-        typeAndSubType: beneficiary.subType
-          ? `${beneficiary.types.join(", ")} - ${beneficiary.subType}`
-          : beneficiary.types.join(", "),
+        types: beneficiary.beneficiaryTypes.map((bt) => bt.type.typeName),
       }));
       setBeneficiaries(formattedBeneficiaries);
-      setFilteredBeneficiaries(formattedBeneficiaries);
-      console.log("Beneficiaries loaded", formattedBeneficiaries);
+      setFilteredBeneficiaries(formattedBeneficiaries); // Initially set filtered beneficiaries
+      console.log("Beneficiaries loaded: ", formattedBeneficiaries); // Log the loaded beneficiaries
     } catch (error) {
       console.error("Error fetching beneficiaries:", error);
     }
   };
 
-  const fetchTypes = async (ageGroup) => {
-    try {
-      const response = await axios.get(
-        `http://localhost:3000/types/typesforparticipation?ageGroup=${ageGroup}`
-      );
-      setTypes(response.data);
-      console.log("Types loaded", response.data);
-    } catch (error) {
-      console.error("Error fetching types:", error);
-    }
-  };
-
   const handleClearSelection = () => {
-    setSelectedAgeGroup("");
-    setSelectedType("");
+    setSelectedAgeGroups([]);
+    setSelectedSexes([]);
+    setSelectedTypes([]);
     setSelectedSubType("");
     setSearchText("");
     setFilteredBeneficiaries(beneficiaries);
@@ -110,15 +97,21 @@ const TargetBeneficiariesModal = ({
   const handleFilterChange = () => {
     let filtered = beneficiaries;
 
-    if (selectedAgeGroup) {
-      filtered = filtered.filter(
-        (beneficiary) => beneficiary.ageGroup === selectedAgeGroup
+    if (selectedAgeGroups.length > 0) {
+      filtered = filtered.filter((beneficiary) =>
+        selectedAgeGroups.includes(beneficiary.ageGroup)
       );
     }
 
-    if (selectedType) {
+    if (selectedSexes.length > 0) {
       filtered = filtered.filter((beneficiary) =>
-        beneficiary.types.includes(selectedType)
+        selectedSexes.includes(beneficiary.sex)
+      );
+    }
+
+    if (selectedTypes.length > 0) {
+      filtered = filtered.filter((beneficiary) =>
+        selectedTypes.some((type) => beneficiary.types.includes(type))
       );
     }
 
@@ -142,8 +135,9 @@ const TargetBeneficiariesModal = ({
   useEffect(() => {
     handleFilterChange();
   }, [
-    selectedAgeGroup,
-    selectedType,
+    selectedAgeGroups,
+    selectedSexes,
+    selectedTypes,
     selectedSubType,
     searchText,
     beneficiaries,
@@ -155,7 +149,7 @@ const TargetBeneficiariesModal = ({
         beneficiaries.find((b) => b.beneficiaryId === id)
       );
 
-      console.log("Selected Beneficiaries:", selectedBeneficiaries);
+      console.log("Selected Beneficiaries: ", selectedBeneficiaries); // Log the selected beneficiaries
 
       const response = await axios.post(
         "http://localhost:3000/participation/add",
@@ -165,7 +159,7 @@ const TargetBeneficiariesModal = ({
         }
       );
 
-      console.log("Response from server:", response.data);
+      console.log("Response from server: ", response.data);
       showSnackbar("Beneficiaries successfully added", "success");
       handleClose();
       refreshParticipations(); // Immediately refresh participations
@@ -175,13 +169,25 @@ const TargetBeneficiariesModal = ({
     }
   };
 
+  const typeColumns = allTypes.map((type) => ({
+    field: type.typeName,
+    headerName: `${type.typeName}?`,
+    width: 150,
+    renderCell: (params) => {
+      const value = params.row.types.includes(type.typeName)
+        ? type.typeName
+        : "No";
+      console.log(`Value for ${type.typeName}: `, value); // Log the value for each type column
+      return <div style={{ whiteSpace: "pre-wrap" }}>{value}</div>;
+    },
+  }));
+
   const columns = [
     { field: "beneficiaryId", headerName: "ID", width: 90 },
     { field: "firstName", headerName: "First Name", width: 150 },
     { field: "middleName", headerName: "Middle Name", width: 150 },
     { field: "lastName", headerName: "Last Name", width: 150 },
     { field: "suffix", headerName: "Suffix", width: 90 },
-    { field: "typeAndSubType", headerName: "Types", width: 250 },
     { field: "birthdate", headerName: "Birthdate", width: 150 },
     { field: "age", headerName: "Age", width: 150 },
     { field: "sex", headerName: "Sex", width: 120 },
@@ -192,6 +198,7 @@ const TargetBeneficiariesModal = ({
     { field: "subType", headerName: "Subtype", width: 150 },
     { field: "civilStatus", headerName: "Civil Status", width: 150 },
     { field: "contactNumber", headerName: "Contact Number", width: 150 },
+    ...typeColumns,
   ];
 
   return (
@@ -236,63 +243,115 @@ const TargetBeneficiariesModal = ({
               fullWidth
               sx={{ mb: 2 }}
             />
-            <FormControl fullWidth>
-              <InputLabel id="age-group-select-label">Age Group</InputLabel>
-              <Select
-                labelId="age-group-select-label"
-                value={selectedAgeGroup}
-                label="Age Group"
-                onChange={(e) => {
-                  setSelectedAgeGroup(e.target.value);
-                  setSelectedType(""); // Clear selected type when age group changes
-                  setSelectedSubType(""); // Clear selected subtype when age group changes
-                  console.log("Selected Age Group:", e.target.value);
-                }}
+            <FormGroup>
+              <Stack
+                direction="column"
+                justifyContent="space-evenly"
+                alignItems="flex-start"
+                spacing={1}
               >
-                {ageGroups.map((group) => (
-                  <MenuItem key={group} value={group}>
-                    {group}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            {types.length > 0 && (
-              <Stack direction="column" spacing={1} mt={2}>
-                {types.map((type) => (
-                  <Box key={type.typeId}>
+                <strong>Age Group:</strong>
+                <Box sx>
+                  {ageGroups.map((group) => (
                     <FormControlLabel
+                      key={group}
                       control={
-                        <Radio
-                          checked={selectedType === type.typeName}
+                        <Checkbox
+                          checked={selectedAgeGroups.includes(group)}
                           onChange={() => {
-                            setSelectedType(type.typeName);
-                            setSelectedSubType("");
+                            setSelectedAgeGroups((prev) =>
+                              prev.includes(group)
+                                ? prev.filter((ageGroup) => ageGroup !== group)
+                                : [...prev, group]
+                            );
                           }}
                         />
                       }
-                      label={type.typeName}
+                      label={group}
                     />
-                    {selectedType === type.typeName &&
-                      type.subTypes.length > 0 && (
-                        <RadioGroup
-                          value={selectedSubType}
-                          onChange={(e) => setSelectedSubType(e.target.value)}
-                          sx={{ ml: 3 }}
-                        >
-                          {type.subTypes.map((subType) => (
-                            <FormControlLabel
-                              key={subType}
-                              value={subType}
-                              control={<Radio />}
-                              label={subType}
-                            />
-                          ))}
-                        </RadioGroup>
-                      )}
-                  </Box>
-                ))}
+                  ))}
+                </Box>
               </Stack>
-            )}
+              <Stack
+                direction="column"
+                justifyContent="space-evenly"
+                alignItems="flex-start"
+                spacing={1}
+              >
+                <strong>Sex:</strong>
+                <Box>
+                  {sexOptions.map((option) => (
+                    <FormControlLabel
+                      key={option}
+                      control={
+                        <Checkbox
+                          checked={selectedSexes.includes(option)}
+                          onChange={() => {
+                            setSelectedSexes((prev) =>
+                              prev.includes(option)
+                                ? prev.filter((sex) => sex !== option)
+                                : [...prev, option]
+                            );
+                          }}
+                        />
+                      }
+                      label={option}
+                    />
+                  ))}
+                </Box>
+              </Stack>
+              <Stack
+                direction="column"
+                justifyContent="space-evenly"
+                alignItems="flex-start"
+                spacing={1}
+              >
+                <Box>
+                  <strong>Types:</strong>
+                  {allTypes.map((type) => (
+                    <Box key={type.typeId}>
+                      <FormControlLabel
+                        control={
+                          <Checkbox
+                            checked={selectedTypes.includes(type.typeName)}
+                            onChange={() => {
+                              setSelectedTypes((prev) =>
+                                prev.includes(type.typeName)
+                                  ? prev.filter((t) => t !== type.typeName)
+                                  : [...prev, type.typeName]
+                              );
+                              setSelectedSubType("");
+                            }}
+                          />
+                        }
+                        label={type.typeName}
+                      />
+                      {selectedTypes.includes(type.typeName) &&
+                        type.subTypes.length > 0 && (
+                          <Box sx={{ ml: 3 }}>
+                            <FormGroup>
+                              {type.subTypes.map((subType) => (
+                                <FormControlLabel
+                                  key={subType}
+                                  control={
+                                    <Checkbox
+                                      checked={selectedSubType === subType}
+                                      onChange={() =>
+                                        setSelectedSubType(subType)
+                                      }
+                                    />
+                                  }
+                                  label={subType}
+                                />
+                              ))}
+                            </FormGroup>
+                          </Box>
+                        )}
+                    </Box>
+                  ))}
+                </Box>
+              </Stack>
+            </FormGroup>
           </Stack>
           <Box sx={{ width: "67%" }}>
             <div style={{ height: 600, width: "100%", marginBottom: 16 }}>
@@ -300,24 +359,18 @@ const TargetBeneficiariesModal = ({
                 rows={filteredBeneficiaries}
                 columns={columns}
                 pageSize={5}
-                columnVisibilityModel={{
-                  beneficiaryId: false,
-                  birthdate: false,
-                  age: false,
-                  sex: false,
-                  job: false,
-                  healthStation: false,
-                  civilStatus: false,
-                  contactNumber: false,
-                  subType: false,
-                }}
                 getRowHeight={() => 130}
                 checkboxSelection
                 onRowSelectionModelChange={(newSelection) => {
                   setSelectedRows(newSelection);
-                  console.log("Selected Rows:", newSelection);
+                  console.log("Selected Rows: ", newSelection);
                 }}
                 getRowId={(row) => row.beneficiaryId}
+                sx={{
+                  "& .MuiDataGrid-columnHeaderTitle": {
+                    fontWeight: "bold",
+                  },
+                }}
               />
             </div>
           </Box>

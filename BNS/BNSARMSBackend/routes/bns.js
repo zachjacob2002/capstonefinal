@@ -191,4 +191,32 @@ router.put("/manage-account", async (req, res) => {
   }
 });
 
+router.get("/feedback/:userId", async (req, res) => {
+  const { userId } = req.params;
+
+  try {
+    // Fetch user details from the database
+    const user = await prisma.user.findUnique({
+      where: { user_id: parseInt(userId) },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Send user details as response
+    res.status(200).json({
+      firstName: user.firstName,
+      lastName: user.lastName,
+      username: user.username,
+      role: user.role,
+      sex: user.sex,
+      barangay: user.barangay,
+    });
+  } catch (error) {
+    console.error("Failed to fetch user details:", error);
+    res.status(500).json({ error: "Failed to fetch user details" });
+  }
+});
+
 module.exports = router;

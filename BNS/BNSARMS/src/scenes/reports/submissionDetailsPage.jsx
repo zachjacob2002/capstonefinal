@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 import {
   Box,
   Button,
@@ -71,7 +72,15 @@ const ReportSubmissionPage = () => {
         );
         setReportDetails(response.data);
         setFileHistory(response.data.fileHistory);
-        setFeedbackHistory(response.data.feedbackHistory);
+        setFeedbackHistory(
+          response.data.feedbackHistory.map((feedback) => ({
+            ...feedback,
+            user: feedback.user || {
+              firstName: "Unknown",
+              lastName: "User",
+            },
+          }))
+        );
 
         if (response.data.fileHistory.length > 0) {
           setStatus(response.data.userStatus);
@@ -164,7 +173,6 @@ const ReportSubmissionPage = () => {
       return;
     }
 
-    // Ensure the submission ID is available
     const submissionId = fileHistory[0]?.submissionId;
 
     if (!submissionId) {
@@ -173,19 +181,37 @@ const ReportSubmissionPage = () => {
     }
 
     try {
-      const response = await axios.post(
+      const feedbackResponse = await axios.post(
         `http://localhost:3000/newReports/${reportId}/feedback`,
         {
           userId: user.user_id,
           content: feedback,
-          submissionId, // Include the submissionId in the feedback request
+          submissionId,
         }
       );
 
-      console.log("Feedback response:", response.data);
-
-      setFeedbackHistory([...feedbackHistory, response.data]);
+      setFeedbackHistory([
+        ...feedbackHistory,
+        {
+          ...feedbackResponse.data,
+          user: feedbackResponse.data.user || {
+            firstName: "Unknown",
+            lastName: "User",
+          },
+        },
+      ]);
       setFeedback("");
+
+      if (user.role === "1") {
+        await axios.patch(
+          `http://localhost:3000/newReports/${reportId}/status`,
+          {
+            userId: userId,
+            status: pendingStatus || status,
+          }
+        );
+        setPendingStatus(null); // Clear the pending status
+      }
     } catch (error) {
       console.error("Feedback submission error:", error);
     }
@@ -244,7 +270,7 @@ const ReportSubmissionPage = () => {
     (a, b) => b[0].submissionId - a[0].submissionId
   );
 
-  const recentSubmission = sortedFileHistoryArray.shift();
+  const allSubmissions = sortedFileHistoryArray.flat();
 
   console.log("Sorted File History:", sortedFileHistoryArray);
 
@@ -256,7 +282,7 @@ const ReportSubmissionPage = () => {
     const isLate = date.isAfter(dueDate);
     return (
       <span>
-        Submitted last Month - {date.format("MM-DD hh:mm A")}
+        Created at: {date.format("hh:mm A - MMMM DD - YYYY")}
         {isLate && <span style={{ color: "red" }}> (Late)</span>}
       </span>
     );
@@ -289,23 +315,14 @@ const ReportSubmissionPage = () => {
       <Typography sx={{ fontWeight: "bold", mt: 2 }}>
         Time Remaining: {calculateTimeLeft()}
       </Typography>
-      <Typography sx={{ fontWeight: "bold", mt: 2 }}>Status:</Typography>
-
-      <Box
-        sx={{
-          padding: 1,
-          borderRadius: "25px",
-          width: "fit-content",
-          mt: 1,
-        }}
-      >
+      <Box sx={{ display: "flex", alignItems: "center", mt: 2 }}>
+        <Typography sx={{ fontWeight: "bold", mr: 1 }}>Status:</Typography>
         {user.role === "1" ? (
           <>
-            <Button
-              variant="contained"
-              onClick={handleButtonClick}
+            <Typography
               sx={{
-                backgroundColor:
+                fontWeight: "bold",
+                color:
                   status === "Submitted"
                     ? "orange"
                     : status === "Needs Revision"
@@ -313,15 +330,27 @@ const ReportSubmissionPage = () => {
                     : status === "Completed"
                     ? "green"
                     : "grey",
+                mr: 2,
+              }}
+            >
+              {status}
+            </Typography>
+            <Button
+              variant="contained"
+              onClick={handleButtonClick}
+              sx={{
+                backgroundColor: "green",
                 color: "white",
                 fontWeight: "bold",
                 borderRadius: "5px",
                 padding: "5px 15px",
               }}
               endIcon={<KeyboardArrowDownIcon />}
+              disabled={status === "Completed"} // Disable the button when the status is "Completed"
             >
-              {status}
+              Change Status
             </Button>
+
             <Menu
               anchorEl={anchorEl}
               open={Boolean(anchorEl)}
@@ -339,25 +368,93 @@ const ReportSubmissionPage = () => {
             </Menu>
           </>
         ) : (
-          <Box
+          <Typography
             sx={{
-              color: `${
+              fontWeight: "bold",
+              color:
                 status === "Submitted"
                   ? "orange"
                   : status === "Needs Revision"
                   ? "red"
                   : status === "Completed"
                   ? "green"
-                  : "grey"
-              }`,
-              width: "fit-content",
-              mt: 1,
+                  : "grey",
             }}
           >
-            <Typography sx={{ fontWeight: "bold" }}>{status}</Typography>
-          </Box>
+            {status}
+          </Typography>
         )}
       </Box>
+      <Typography variant="h6" sx={{ mt: 2, fontWeight: "bold" }}>
+        Comments:
+      </Typography>
+      <List sx={{ overflow: "auto" }}>
+        {feedbackHistory.map((feedbackItem) => (
+          <ListItem
+            key={feedbackItem.feedbackId}
+            sx={{
+              display: "flex",
+              justifyContent:
+                user.role === "1"
+                  ? feedbackItem.createdBy === user.user_id
+                    ? "flex-end"
+                    : "flex-start"
+                  : feedbackItem.createdBy === 1
+                  ? "flex-start"
+                  : "flex-end",
+            }}
+          >
+            <Paper
+              sx={{
+                maxWidth: "70%",
+                bgcolor:
+                  feedbackItem.createdBy === user.user_id
+                    ? "#8bc34a"
+                    : "darkGreen",
+                color: "common.white",
+                p: 1,
+                borderRadius: "10px",
+                mt: 1,
+                wordWrap: "break-word",
+              }}
+            >
+              <Typography>{feedbackItem.content}</Typography>
+              <Typography variant="caption" display="block" sx={{ mt: 1 }}>
+                Sent By: {feedbackItem.user.lastName},{" "}
+                {feedbackItem.user.firstName}, at{" "}
+                {dayjs(feedbackItem.createdAt).format(
+                  "hh:mm A - MMMM DD - YYYY"
+                )}
+              </Typography>
+            </Paper>
+          </ListItem>
+        ))}
+      </List>
+
+      {(user.role !== "1" && status !== "Completed") ||
+      (user.role === "1" && status === "Needs Revision") ? (
+        <>
+          <TextField
+            label="Comments"
+            multiline
+            rows={4}
+            fullWidth
+            sx={{ mt: 2 }}
+            value={feedback}
+            onChange={(e) => setFeedback(e.target.value)}
+          />
+          <Box display="flex" justifyContent="flex-end" mt={2}>
+            <Button
+              variant="contained"
+              sx={{ color: "white", mt: 2, ml: 1, backgroundColor: "green" }}
+              onClick={handleFeedbackSubmit}
+            >
+              Send
+            </Button>
+          </Box>
+        </>
+      ) : null}
+
       <Divider sx={{ my: 2, width: "100%" }} />
 
       {user.role !== "1" && (
@@ -416,137 +513,55 @@ const ReportSubmissionPage = () => {
       )}
 
       <Typography variant="h6" sx={{ mt: 2, fontWeight: "bold" }}>
-        Recent Submission:
+        Submissions:
       </Typography>
       <Box sx={{ mt: 1 }}>
-        {recentSubmission &&
-          recentSubmission.map((file, index) => (
-            <Paper
-              key={index}
+        {allSubmissions.map((file, index) => (
+          <Box
+            key={index}
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              mb: 1,
+              p: 1,
+              "&:hover .file-name": {
+                color: "green",
+              },
+            }}
+          >
+            <Box
               sx={{
-                display: "inline-block",
-                padding: 1,
-                borderRadius: "5px",
-                mr: 1,
-                mb: 1,
                 cursor: "pointer",
-                boxShadow: "none", // Remove border
-                "&:hover .file-name": {
-                  color: "green",
-                },
+                flex: 1,
               }}
               onClick={handleFileClick(file)}
             >
-              <Typography className="file-name" sx={{ display: "block" }}>
-                {file.fileName}
+              <Typography className="file-name">{file.fileName}</Typography>
+            </Box>
+            <Box sx={{ flex: 1 }}>
+              <Typography>
+                Submitted Last:{" "}
+                {dayjs(file.createdAt).format("hh:mm A - MMMM DD - YYYY")}
               </Typography>
+            </Box>
+            <Box sx={{ flex: 1 }}>
               <Typography
-                variant="caption"
-                color="textSecondary"
-                sx={{ display: "block" }}
-              >
-                {formatSubmissionDate(file.createdAt)}
-              </Typography>
-            </Paper>
-          ))}
-      </Box>
-      <Divider sx={{ my: 2, width: "100%" }} />
-
-      <Typography variant="h6" sx={{ mt: 2, fontWeight: "bold" }}>
-        Previous Submissions:
-      </Typography>
-      <Box sx={{ mt: 1 }}>
-        {sortedFileHistoryArray.map((batch, batchIndex) => (
-          <Box key={batchIndex} sx={{ mb: 2 }}>
-            {batch.map((file, index) => (
-              <Paper
-                key={index}
                 sx={{
-                  display: "inline-block",
-                  padding: 1,
-                  borderRadius: "5px",
-                  mr: 1,
-                  mb: 1,
-                  cursor: "pointer",
-                  boxShadow: "none", // Remove border
-                  "&:hover .file-name": {
-                    color: "green",
-                  },
+                  color: dayjs(file.createdAt).isAfter(
+                    dayjs(reportDetails?.dueDate)
+                  )
+                    ? "red"
+                    : "black",
                 }}
-                onClick={handleFileClick(file)}
               >
-                <Typography className="file-name" sx={{ display: "block" }}>
-                  {file.fileName}
-                </Typography>
-                <Typography
-                  variant="caption"
-                  color="textSecondary"
-                  sx={{ display: "block" }}
-                >
-                  {formatSubmissionDate(file.createdAt)}
-                </Typography>
-              </Paper>
-            ))}
-            {batchIndex !== sortedFileHistoryArray.length - 1 && <Divider />}
+                {dayjs(file.createdAt).isAfter(dayjs(reportDetails?.dueDate))
+                  ? "Late"
+                  : ""}
+              </Typography>
+            </Box>
           </Box>
         ))}
       </Box>
-      <Divider sx={{ my: 2, width: "100%" }} />
-
-      <Typography variant="h6" sx={{ mt: 2, fontWeight: "bold" }}>
-        Remarks History:
-      </Typography>
-      <List sx={{ overflow: "auto" }}>
-        {feedbackHistory.map((feedbackItem) => (
-          <ListItem
-            key={feedbackItem.feedbackId}
-            sx={{
-              display: "flex",
-              justifyContent:
-                user.role === "1"
-                  ? feedbackItem.createdBy === user.user_id
-                    ? "flex-end"
-                    : "flex-start"
-                  : feedbackItem.createdBy === 1
-                  ? "flex-start"
-                  : "flex-end",
-            }}
-          >
-            <Paper
-              sx={{
-                maxWidth: "70%",
-                bgcolor:
-                  feedbackItem.createdBy === user.user_id
-                    ? "#8bc34a"
-                    : "darkGreen",
-                color: "common.white",
-                p: 1,
-                borderRadius: "10px",
-                mt: 1,
-                wordWrap: "break-word",
-              }}
-            >
-              <Typography>{feedbackItem.content}</Typography>
-            </Paper>
-          </ListItem>
-        ))}
-      </List>
-      <TextField
-        label="Remarks"
-        multiline
-        rows={4}
-        fullWidth
-        sx={{ mt: 2 }}
-        value={feedback}
-        onChange={(e) => setFeedback(e.target.value)}
-      />
-      <Button
-        variant="contained"
-        sx={{ color: "white", mt: 2, ml: 1, backgroundColor: "green" }}
-        onClick={handleFeedbackSubmit}
-      >
-        Send Remarks
-      </Button>
 
       <Box display="flex" justifyContent="flex-end" mt={2}>
         {user.role !== "1" && (
