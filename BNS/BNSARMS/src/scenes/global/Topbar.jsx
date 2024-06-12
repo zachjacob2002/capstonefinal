@@ -41,10 +41,18 @@ const Topbar = () => {
   const notificationOpen = Boolean(notificationAnchorEl);
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState([]);
+  const [newReports, setNewReports] = useState([]);
   const { user, logout } = useAuthStore();
   const apiBaseUrl = "http://localhost:3000"; // Adjust this URL to your backend server's URL
 
   const goBack = () => navigate(-1);
+
+  useEffect(() => {
+    const fetchNewReports = async () => {
+    };
+
+    fetchNewReports();
+  }, []);
 
   useEffect(() => {
     if (user && user.user_id) {
@@ -54,6 +62,7 @@ const Topbar = () => {
             params: { userId: user.user_id },
           });
           setNotifications(response.data);
+
         } catch (error) {
           console.error("Failed to fetch notifications:", error);
         }
@@ -86,10 +95,57 @@ const Topbar = () => {
     } catch (error) {
       console.error("Failed to mark notifications as read:", error);
     }
+    //FOR DUE DATE HANDLING
+
+    try {
+      console.log("fetching");
+      const response = await axios.get(`${apiBaseUrl}/newReports`, {
+          params: { isArchived: false },
+      });
+      const today = new Date();
+  
+      // An array to store promises for each asynchronous operation
+      const promises = response.data.map(async (e) => {
+          // CHECK IF SUBMITTED
+          var userString = localStorage.getItem('user');
+          var jsonUser = JSON.parse(userString);
+  
+          const dueDate = new Date(e.dueDate);
+  
+          const submitted = await axios.get(`${apiBaseUrl}/dashboard/user-report-status`, {
+              params: { 
+                  userId: jsonUser.user_id, 
+                  type: e.type, 
+                  year: dueDate.getFullYear(), 
+                  month: e.month 
+              },
+          });
+  
+          e.dueStatus = dueDate.getTime() < today.getTime() ? 2 : 
+                        dueDate.getDate() === today.getDate() && dueDate.getTime() > today.getTime() ? 1 : 
+                        0;
+          if (submitted.data.status == 'Submitted') e.dueStatus = 3;
+  
+          return e; // Return the modified object
+      });
+  
+      // Wait for all promises to resolve
+      const updatedReports = await Promise.all(promises);
+  
+      setNewReports(updatedReports);
+      console.log(newReports);
+  } catch (error) {
+      console.error('Error fetching new reports:', error);
+  }
+  
   };
 
   const handleNotificationClose = () => {
     setNotificationAnchorEl(null);
+  };
+
+  const handleDueDateClick = (id)=>{
+    window.location.replace(`/app/bns-submission-page/${id}`);
   };
 
   const handleLogoutClick = () => {
@@ -167,6 +223,21 @@ const Topbar = () => {
         </CardContent>
         <Divider />
         <List dense>
+        {newReports.filter(report => report.dueStatus !== 0 && report.dueStatus !== 3).map((report, index) => (
+            <ListItem key={index} button onClick={() => handleDueDateClick(report.reportId)} style={{ backgroundColor: report.dueStatus === 1 ? 'yellow' : '#dd9595' }}>
+              <ListItemIcon>
+                {report.dueStatus}
+                <MailOutlineIcon color="primary" />
+              </ListItemIcon>
+              <ListItemText
+                primary={report.dueStatus == 1 ? `You have a ${report.type} due today! Please comply.` : `Your ${report.type} is already due!`}
+                secondary={`Due ${new Date(
+                  report.dueDate
+                ).toLocaleString()}`}
+              />
+            </ListItem>
+          ))}
+          
           {notifications.map((notification, index) => (
             <ListItem key={index} button onClick={onClose}>
               <ListItemIcon>
